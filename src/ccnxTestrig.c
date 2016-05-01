@@ -144,12 +144,6 @@ main(int argc, char** argv)
     // TODO
 
 
-    // PusherOptions *options = parseCommandLineOptions(argc, argv);
-    // if (options == NULL) {
-    //     return EXIT_FAILURE;
-    // }
-    //
-    // Pusher *pusher = initializePusher(options);
-    // runPusherPerPacket(pusher);
-    // displayPusherStats(options, pusher);
+
+    return 0;
 }
