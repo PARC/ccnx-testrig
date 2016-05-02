@@ -14,8 +14,8 @@ set(CCNX_LIBRARIES longbow longbow-ansiterm parc ccnx_common ccnx_api_portal ccn
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 set(CCNX_TESTRIG_SOURCES
-        ccnxTestrig_Link.c
-        ccnxTestrig.c)
+        src/ccnxTestrig_Link.c
+        src/ccnxTestrig.c)
 
 include_directories(${CCNX_HOME}/include)
 

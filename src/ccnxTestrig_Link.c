@@ -1,4 +1,3 @@
-#include "ccnxTestrig_link.h"
 #include <unistd.h>
 #include <netdb.h>
 #include <sys/types.h>
@@ -7,14 +6,20 @@
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <errno.h>
+#include <stdbool.h>
 
-#include "util.h"
+#include <parc/algol/parc_Object.h>
+
+#include "ccnxTestrig_link.h"
+
+#define MTU 4096
+#define MAX_NUMBER_OF_TCP_CONNECTIONS 2
 
 struct ccnx_testrig_link {
     CCNxTestrigLinkType type;
 
-    int (*receiveFunction)(CCNxTestrigLink *, uint8_t *);
-    int (*sendFunction)(CCNxTestrigLink *, uint8_t *, int);
+    PARCBuffer *(*receiveFunction)(CCNxTestrigLink *);
+    int (*sendFunction)(CCNxTestrigLink *, PARCBuffer *);
 
     int port;
     int socket;
@@ -41,35 +46,53 @@ parcObject_Override(
 	CCNxTestrigLink, PARCObject,
 	.destructor = (PARCObjectDestructor *) _ccnxTestrigLink_Destructor);
 
-static int
-_udp_receive(CCNxTestrigLink *link, uint8_t *buffer)
+static PARCBuffer *
+_udp_receive(CCNxTestrigLink *link)
 {
+    uint8_t buffer[MTU];
     int numBytesReceived = recvfrom(link->socket, buffer, MTU, 0, (struct sockaddr *) &(link->targetAddress), &(link->targetAddressLength));
     if (numBytesReceived < 0) {
         fprintf(stderr, "recvfrom() failed");
     }
-    return numBytesReceived;
+
+    PARCBuffer *result = parcBuffer_Allocate(numBytesReceived);
+    parcBuffer_PutArray(result, numBytesReceived, buffer);
+    parcBuffer_Flip(result);
+
+    return result;
 }
 
 static int
-_udp_send(CCNxTestrigLink *link, uint8_t *buffer, int length)
+_udp_send(CCNxTestrigLink *link, PARCBuffer *buffer)
 {
-    int val = sendto(link->socket, buffer, length, 0,
+    size_t length = parcBuffer_Remaining(buffer);
+    uint8_t *bufferOverlay = parcBuffer_Overlay(buffer, length);
+    int val = sendto(link->socket, bufferOverlay, length, 0,
         (struct sockaddr *) &link->targetAddress, link->targetAddressLength);
+
+    printf("sent %d bytes\n", val);
     return val;
 }
 
-static int
-_tcp_receive(CCNxTestrigLink *link, uint8_t *buffer)
+static PARCBuffer *
+_tcp_receive(CCNxTestrigLink *link)
 {
+    uint8_t buffer[MTU];
     int recvMsgSize = recv(link->targetSocket, buffer, MTU, 0);
-    return recvMsgSize;
+
+    PARCBuffer *result = parcBuffer_Allocate(recvMsgSize);
+    parcBuffer_PutArray(result, recvMsgSize, buffer);
+    parcBuffer_Flip(result);
+
+    return result;
 }
 
 static int
-_tcp_send(CCNxTestrigLink *link, uint8_t *buffer, int length)
+_tcp_send(CCNxTestrigLink *link, PARCBuffer *buffer)
 {
-    int numSent = send(link->targetSocket, buffer, length, 0);
+    size_t length = parcBuffer_Remaining(buffer);
+    uint8_t *bufferOverlay = parcBuffer_Overlay(buffer, length);
+    int numSent = send(link->targetSocket, bufferOverlay, length, 0);
     return numSent;
 }
 
@@ -116,6 +139,8 @@ _create_udp_ccnxTestrigLink_listener(char *address, int port)
         fprintf(stderr, "bind() failed");
     }
 
+    printf("Accepted!\n");
+
     return link;
 }
 
@@ -156,10 +181,12 @@ _create_tcp_ccnxTestrigLink_listener(char *address, int port)
         fprintf(stderr, "accept() failed");
     }
 
+    printf("Accepted!\n");
+
     return link;
 }
 
-static Link *
+static CCNxTestrigLink *
 _create_udp_link(char *address, int port)
 {
     CCNxTestrigLink *link = _create_link();
@@ -219,9 +246,9 @@ CCNxTestrigLink *
 ccnxTestrigLink_Listen(CCNxTestrigLinkType type, char *address, int port)
 {
     switch (type) {
-        case LinkType_UDP:
+        case CCNxTestrigLinkType_UDP:
             return _create_udp_ccnxTestrigLink_listener(address, port);
-        case LinkType_TCP:
+        case CCNxTestrigLinkType_TCP:
             return _create_tcp_ccnxTestrigLink_listener(address, port);
         default:
             fprintf(stderr, "Error: invalid LinkType specified: %d", type);
@@ -233,9 +260,9 @@ CCNxTestrigLink *
 ccnxTestrigLink_Connect(CCNxTestrigLinkType type, char *address, int port)
 {
     switch (type) {
-        case LinkType_UDP:
+        case CCNxTestrigLinkType_UDP:
             return _create_udp_link(address, port);
-        case LinkType_TCP:
+        case CCNxTestrigLinkType_TCP:
             return _create_tcp_link(address, port);
         default:
             fprintf(stderr, "Error: invalid LinkType specified: %d", type);
@@ -249,16 +276,16 @@ ccnxTestrigLink_SetTimeout(CCNxTestrigLink *link, struct timeval tv)
     setsockopt(link->socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
 }
 
-int
-ccnxTestrigLink_Receive(CCNxTestrigLink *link, uint8_t *buffer)
+PARCBuffer *
+ccnxTestrigLink_Receive(CCNxTestrigLink *link)
 {
-    return link->receiveFunction(link, buffer);
+    return link->receiveFunction(link);
 }
 
 int
-ccnxTestrigLink_Send(CCNxTestrigLink *link, uint8_t *buffer, int length)
+ccnxTestrigLink_Send(CCNxTestrigLink *link, PARCBuffer *buffer)
 {
-    return link->sendFunction(link, buffer, length);
+    return link->sendFunction(link, buffer);
 }
 
 void
