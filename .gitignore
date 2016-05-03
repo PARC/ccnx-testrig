@@ -60,3 +60,14 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+# CMake stuff
+CMakeCache.txt
+CMakeFiles/*
+CTestTestfile.cmake
+DartConfiguration.tcl
+Makefile
+cmake_install.cmake
+
+# Binaries
+ccnxTestrig

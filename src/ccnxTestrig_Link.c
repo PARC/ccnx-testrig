@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <poll.h>
 
 #include <parc/algol/parc_Object.h>
 
@@ -18,7 +19,7 @@
 struct ccnx_testrig_link {
     CCNxTestrigLinkType type;
 
-    PARCBuffer *(*receiveFunction)(CCNxTestrigLink *);
+    PARCBuffer *(*receiveFunction)(CCNxTestrigLink *, int);
     int (*sendFunction)(CCNxTestrigLink *, PARCBuffer *);
 
     int port;
@@ -47,19 +48,32 @@ parcObject_Override(
 	.destructor = (PARCObjectDestructor *) _ccnxTestrigLink_Destructor);
 
 static PARCBuffer *
-_udp_receive(CCNxTestrigLink *link)
+_udp_receive(CCNxTestrigLink *link, int timeout)
 {
-    uint8_t buffer[MTU];
-    int numBytesReceived = recvfrom(link->socket, buffer, MTU, 0, (struct sockaddr *) &(link->targetAddress), &(link->targetAddressLength));
-    if (numBytesReceived < 0) {
-        fprintf(stderr, "recvfrom() failed");
+    struct pollfd fd;
+    fd.fd = link->socket;
+    fd.events = POLLIN;
+    int res = poll(&fd, 1, timeout);
+
+    if (res == 0) {
+        return NULL;
+    } else if (res == -1) {
+        perror("An error occurred while receiving");
+        return NULL;
+    } else {
+        uint8_t buffer[MTU];
+        int numBytesReceived = recvfrom(link->socket, buffer, MTU, 0, (struct sockaddr *) &(link->targetAddress), &(link->targetAddressLength));
+        if (numBytesReceived < 0) {
+            fprintf(stderr, "recvfrom() failed");
+            return NULL;
+        }
+
+        PARCBuffer *result = parcBuffer_Allocate(numBytesReceived);
+        parcBuffer_PutArray(result, numBytesReceived, buffer);
+        parcBuffer_Flip(result);
+
+        return result;
     }
-
-    PARCBuffer *result = parcBuffer_Allocate(numBytesReceived);
-    parcBuffer_PutArray(result, numBytesReceived, buffer);
-    parcBuffer_Flip(result);
-
-    return result;
 }
 
 static int
@@ -75,16 +89,28 @@ _udp_send(CCNxTestrigLink *link, PARCBuffer *buffer)
 }
 
 static PARCBuffer *
-_tcp_receive(CCNxTestrigLink *link)
+_tcp_receive(CCNxTestrigLink *link, int timeout)
 {
-    uint8_t buffer[MTU];
-    int recvMsgSize = recv(link->targetSocket, buffer, MTU, 0);
+    struct pollfd fd;
+    fd.fd = link->targetSocket;
+    fd.events = POLLIN;
+    int res = poll(&fd, 1, timeout);
 
-    PARCBuffer *result = parcBuffer_Allocate(recvMsgSize);
-    parcBuffer_PutArray(result, recvMsgSize, buffer);
-    parcBuffer_Flip(result);
+    if (res == 0) {
+        return NULL;
+    } else if (res == -1) {
+        perror("An error occurred while receiving");
+        return NULL;
+    } else {
+        uint8_t buffer[MTU];
+        int recvMsgSize = recv(link->targetSocket, buffer, MTU, 0);
 
-    return result;
+        PARCBuffer *result = parcBuffer_Allocate(recvMsgSize);
+        parcBuffer_PutArray(result, recvMsgSize, buffer);
+        parcBuffer_Flip(result);
+
+        return result;
+    }
 }
 
 static int
@@ -270,16 +296,22 @@ ccnxTestrigLink_Connect(CCNxTestrigLinkType type, char *address, int port)
     }
 }
 
-void
-ccnxTestrigLink_SetTimeout(CCNxTestrigLink *link, struct timeval tv)
-{
-    setsockopt(link->socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
-}
+// void
+// ccnxTestrigLink_SetTimeout(CCNxTestrigLink *link, struct timeval tv)
+// {
+//     setsockopt(link->socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
+// }
 
 PARCBuffer *
 ccnxTestrigLink_Receive(CCNxTestrigLink *link)
 {
-    return link->receiveFunction(link);
+    return link->receiveFunction(link, -1);
+}
+
+PARCBuffer *
+ccnxTestrigLink_ReceiveWithTimeout(CCNxTestrigLink *link, int timeout)
+{
+    return link->receiveFunction(link, timeout);
 }
 
 int

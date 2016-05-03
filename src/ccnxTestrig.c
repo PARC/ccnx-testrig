@@ -201,7 +201,8 @@ static void
 _ccnxTestrig_TestBasicExchange(CCNxTestrig *rig)
 {
     // Create the test packets
-    CCNxName *testName = ccnxName_CreateFromCString("ccnx:/test/test1");
+    CCNxName *testName = ccnxName_CreateFromCString("ccnx:/test/_ccnxTestrig_TestBasicExchange");
+    assertNotNull(testName, "The name must not be NULL");
     PARCBuffer *testPayload = parcBuffer_WrapCString("_ccnxTestrig_TestBasicExchange");
 
     // Create the protocol messages
@@ -216,7 +217,7 @@ _ccnxTestrig_TestBasicExchange(CCNxTestrig *rig)
     printf("Sending the first interest\n");
     ccnxTestrigLink_Send(rig->link1, interestBuffer);
     printf("Waiting for the response\n");
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_Receive(rig->link3);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(rig->link3, 1000);
 
     // Verify that the interest is correct
     CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
