@@ -27,44 +27,44 @@
 #include <ccnx/transport/common/transport_MetaMessage.h>
 #include <ccnx/transport/common/transport_Message.h>
 
-#include "ccnxTestrig_Link.h"
+#include "ccnxTestrig.h"
 
 typedef struct {
     CCNxTestrigLinkType linkType;
     char *fwdIPAddress;
     int fwdPort;
-} CCNxTestrigOptions;
+} _CCNxTestrigOptions;
 
 static bool
-_ccnxTestrigOptions_Destructor(CCNxTestrigOptions **optionsPtr)
+__CCNxTestrigOptions_Destructor(_CCNxTestrigOptions **optionsPtr)
 {
-    CCNxTestrigOptions *options = *optionsPtr;
+    _CCNxTestrigOptions *options = *optionsPtr;
     return true;
 }
 
-parcObject_ImplementAcquire(ccnxTestrigOptions, CCNxTestrigOptions);
-parcObject_ImplementRelease(ccnxTestrigOptions, CCNxTestrigOptions);
+parcObject_ImplementAcquire(_CCNxTestrigOptions, _CCNxTestrigOptions);
+parcObject_ImplementRelease(_CCNxTestrigOptions, _CCNxTestrigOptions);
 
 parcObject_Override(
-	CCNxTestrigOptions, PARCObject,
-	.destructor = (PARCObjectDestructor *) _ccnxTestrigOptions_Destructor);
+	_CCNxTestrigOptions, PARCObject,
+	.destructor = (PARCObjectDestructor *) __CCNxTestrigOptions_Destructor);
 
-typedef struct {
-    CCNxTestrigLink *link1;
-    CCNxTestrigLink *link2;
-    CCNxTestrigLink *link3;
+struct ccnx_testrig {
+    CCNxTestrigLink *linkA;
+    CCNxTestrigLink *linkB;
+    CCNxTestrigLink *linkC;
 
-    CCNxTestrigOptions *options;
-} CCNxTestrig;
+    _CCNxTestrigOptions *options;
+};
 
 static bool
 _ccnxTestrig_Destructor(CCNxTestrig **testrigPtr)
 {
     CCNxTestrig *testrig = *testrigPtr;
 
-    ccnxTestrigLink_Release(&testrig->link1);
-    ccnxTestrigLink_Release(&testrig->link2);
-    ccnxTestrigLink_Release(&testrig->link3);
+    ccnxTestrigLink_Release(&testrig->linkA);
+    ccnxTestrigLink_Release(&testrig->linkB);
+    ccnxTestrigLink_Release(&testrig->linkC);
 
     return true;
 }
@@ -77,18 +77,116 @@ parcObject_Override(
 	.destructor = (PARCObjectDestructor *) _ccnxTestrig_Destructor);
 
 CCNxTestrig *
-ccnxTestrig_Create(CCNxTestrigOptions *options)
+ccnxTestrig_Create(_CCNxTestrigOptions *options, CCNxTestrigLink *linkA, CCNxTestrigLink *linkB, CCNxTestrigLink *linkC)
 {
     CCNxTestrig *testrig = parcObject_CreateInstance(CCNxTestrig);
 
     if (testrig != NULL) {
-        testrig->options = ccnxTestrigOptions_Acquire(options);
-        testrig->link1 = NULL;
-        testrig->link2 = NULL;
-        testrig->link3 = NULL;
+        testrig->options = _CCNxTestrigOptions_Acquire(options);
+        testrig->linkA = ccnxTestrigLink_Acquire(linkA);
+        testrig->linkB = ccnxTestrigLink_Acquire(linkB);
+        testrig->linkC = ccnxTestrigLink_Acquire(linkC);
     }
 
     return testrig;
+}
+
+CCNxTestrigLink *
+ccnxTestrig_GetLinkA(CCNxTestrig *rig)
+{
+    return rig->linkA;
+}
+
+CCNxTestrigLink *
+ccnxTestrig_GetLinkB(CCNxTestrig *rig)
+{
+    return rig->linkB;
+}
+
+CCNxTestrigLink *
+ccnxTestrig_GetLinkC(CCNxTestrig *rig)
+{
+    return rig->linkC;
+}
+
+static PARCBuffer *
+_encodeDictionary(const CCNxTlvDictionary *dict)
+{
+    // PARCSigner *signer = ccnxValidationCRC32C_CreateSigner();
+    CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode((CCNxTlvDictionary *) dict, NULL);
+    const struct iovec *array = ccnxCodecNetworkBufferIoVec_GetArray(iovec);
+    size_t iovcnt = ccnxCodecNetworkBufferIoVec_GetCount((CCNxCodecNetworkBufferIoVec *) iovec);
+
+    size_t totalbytes = 0;
+    for (int i = 0; i < iovcnt; i++) {
+        totalbytes += array[i].iov_len;
+    }
+    PARCBuffer *buffer = parcBuffer_Allocate(totalbytes);
+    for (int i = 0; i < iovcnt; i++) {
+        parcBuffer_PutArray(buffer, array[i].iov_len, array[i].iov_base);
+    }
+    parcBuffer_Flip(buffer);
+
+    ccnxCodecNetworkBufferIoVec_Release(&iovec);
+
+    return buffer;
+}
+
+static void
+_ccnxTestrig_TestBasicExchange(CCNxTestrig *rig)
+{
+    // Create the test packets
+    CCNxName *testName = ccnxName_CreateFromCString("ccnx:/foo/bar");
+    assertNotNull(testName, "The name must not be NULL");
+    PARCBuffer *testPayload = parcBuffer_WrapCString("_ccnxTestrig_TestBasicExchange");
+
+    // Create the protocol messages
+    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
+    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
+
+    // Stamp wire format representations
+    PARCBuffer *interestBuffer = _encodeDictionary(interest);
+    PARCBuffer *contentBuffer = _encodeDictionary(content);
+
+    // Send the interest to the forwarder.
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    assertNotNull(receivedInterestBuffer, "Failed to receive a packet from the forwarder.");
+
+    // Verify that the interest is correct
+    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
+    assertTrue(ccnxMetaMessage_IsInterest(reconstructedInterest), "Expected the received message to be an interest.");
+
+    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+    // TODO: write comparisons for interest fields (hop count will be less!)
+    // assertTrue(ccnxInterest_Equals(receivedInterest, interest), "Expected the received interest to match that which was sent.");
+
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_Receive(ccnxTestrig_GetLinkC(rig));
+
+    CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
+    assertTrue(ccnxMetaMessage_IsContentObject(reconstructedContent), "Expected the received message to be a content object.");
+
+    CCNxContentObject *receivedContent = ccnxMetaMessage_GetInterest(reconstructedContent);
+    assertTrue(ccnxName_Equals(ccnxContentObject_GetName(receivedContent), ccnxContentObject_GetName(content)), "Expected the received content object names to match that which was sent.");
+    // TODO: this failed the content object equals test
+
+    parcBuffer_Display(contentBuffer, 0);
+    parcBuffer_Display(receivedContentBuffer, 0);
+
+    ccnxInterest_Release(&interest);
+    ccnxContentObject_Release(&content);
+
+    parcBuffer_Release(&interestBuffer);
+    parcBuffer_Release(&contentBuffer);
+    parcBuffer_Release(&receivedInterestBuffer);
+    parcBuffer_Release(&receivedContentBuffer);
+
+    ccnxInterest_Release(&receivedInterest);
+    ccnxContentObject_Release(&receivedContent);
+
+    parcBuffer_Release(&testPayload);
+    ccnxName_Release(&testName);
 }
 
 void
@@ -99,7 +197,7 @@ showUsage()
     printf(" -h       --help              Display the help message\n");
 }
 
-static CCNxTestrigOptions *
+static _CCNxTestrigOptions *
 _ccnxTestrig_ParseCommandLineOptions(int argc, char **argv)
 {
     static struct option longopts[] = {
@@ -114,7 +212,7 @@ _ccnxTestrig_ParseCommandLineOptions(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    CCNxTestrigOptions *options = parcObject_CreateInstance(CCNxTestrigOptions);
+    _CCNxTestrigOptions *options = parcObject_CreateInstance(_CCNxTestrigOptions);
     options->fwdPort = 0;
     options->fwdIPAddress = NULL;
 
@@ -145,134 +243,26 @@ _ccnxTestrig_ParseCommandLineOptions(int argc, char **argv)
     return options;
 };
 
-// static CCNxContentObject *
-// _createReceivedContent(CCNxContentObject *preSendContent)
-// {
-//     PARCSigner *signer = ccnxValidationCRC32C_CreateSigner();
-//     CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode(preSendContent, signer);
-//     assertTrue(ccnxWireFormatMessage_PutIoVec(preSendContent, iovec), "ccnxWireFormatMessage_PutIoVec failed");;
-//     parcSigner_Release(&signer);
-//
-//     PARCBuffer *encodedBuffer = _iovecToBuffer(iovec);
-//
-//     CCNxContentObject *postSendContent = ccnxMetaMessage_CreateFromWireFormatBuffer(encodedBuffer);
-//
-//     parcBuffer_Release(&encodedBuffer);
-//
-//     return postSendContent;
-// }
-//
-// static PARCBuffer *
-// _createMessageHash(const CCNxMetaMessage *metaMessage)
-// {
-//     CCNxWireFormatMessage *wireFormatMessage = (CCNxWireFormatMessage *) metaMessage;
-//
-//     PARCCryptoHash *hash = ccnxWireFormatMessage_CreateContentObjectHash(wireFormatMessage);
-//     PARCBuffer *buffer = parcBuffer_Acquire(parcCryptoHash_GetDigest(hash));
-//     parcCryptoHash_Release(&hash);
-//
-//     return buffer;
-// }
-
-static PARCBuffer *
-_encodeDictionary(const CCNxTlvDictionary *dict)
-{
-    // PARCSigner *signer = ccnxValidationCRC32C_CreateSigner();
-    CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode((CCNxTlvDictionary *) dict, NULL);
-    const struct iovec *array = ccnxCodecNetworkBufferIoVec_GetArray(iovec);
-    size_t iovcnt = ccnxCodecNetworkBufferIoVec_GetCount((CCNxCodecNetworkBufferIoVec *) iovec);
-
-    size_t totalbytes = 0;
-    for (int i = 0; i < iovcnt; i++) {
-        totalbytes += array[i].iov_len;
-    }
-    PARCBuffer *buffer = parcBuffer_Allocate(totalbytes);
-    for (int i = 0; i < iovcnt; i++) {
-        parcBuffer_PutArray(buffer, array[i].iov_len, array[i].iov_base);
-    }
-    parcBuffer_Flip(buffer);
-
-    ccnxCodecNetworkBufferIoVec_Release(&iovec);
-
-    return buffer;
-}
-
-static void
-_ccnxTestrig_TestBasicExchange(CCNxTestrig *rig)
-{
-    // Create the test packets
-    CCNxName *testName = ccnxName_CreateFromCString("ccnx:/test/_ccnxTestrig_TestBasicExchange");
-    assertNotNull(testName, "The name must not be NULL");
-    PARCBuffer *testPayload = parcBuffer_WrapCString("_ccnxTestrig_TestBasicExchange");
-
-    // Create the protocol messages
-    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
-    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
-
-    // Stamp wire format representations
-    PARCBuffer *interestBuffer = _encodeDictionary(interest);
-    PARCBuffer *contentBuffer = _encodeDictionary(content);
-
-    // Send the interest to the forwarder.
-    printf("Sending the first interest\n");
-    ccnxTestrigLink_Send(rig->link1, interestBuffer);
-    printf("Waiting for the response\n");
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(rig->link3, 1000);
-
-    // Verify that the interest is correct
-    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
-    assertTrue(ccnxMetaMessage_IsInterest(reconstructedInterest), "Expected the received message to be an interest.");
-
-    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
-    // TODO: write comparisons for interest fields (hop count will be less!)
-    // assertTrue(ccnxInterest_Equals(receivedInterest, interest), "Expected the received interest to match that which was sent.");
-
-    ccnxTestrigLink_Send(rig->link3, contentBuffer);
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_Receive(rig->link1);
-
-    CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
-    assertTrue(ccnxMetaMessage_IsContentObject(reconstructedContent), "Expected the received message to be a content object.");
-
-    CCNxContentObject *receivedContent = ccnxMetaMessage_GetInterest(reconstructedContent);
-    assertTrue(ccnxName_Equals(ccnxContentObject_GetName(receivedContent), ccnxContentObject_GetName(content)), "Expected the received content object names to match that which was sent.");
-    // TODO: this failed the content object equals test
-
-    parcBuffer_Display(contentBuffer, 0);
-    parcBuffer_Display(receivedContentBuffer, 0);
-
-    ccnxInterest_Release(&interest);
-    ccnxContentObject_Release(&content);
-
-    parcBuffer_Release(&interestBuffer);
-    parcBuffer_Release(&contentBuffer);
-    parcBuffer_Release(&receivedInterestBuffer);
-    parcBuffer_Release(&receivedContentBuffer);
-
-    ccnxInterest_Release(&receivedInterest);
-    ccnxContentObject_Release(&receivedContent);
-
-    parcBuffer_Release(&testPayload);
-    ccnxName_Release(&testName);
-}
-
 int
 main(int argc, char** argv)
 {
     // Parse options and create the test rig
-    CCNxTestrigOptions *options = _ccnxTestrig_ParseCommandLineOptions(argc, argv);
-    CCNxTestrig *testrig = ccnxTestrig_Create(options);
+    _CCNxTestrigOptions *options = _ccnxTestrig_ParseCommandLineOptions(argc, argv);
 
     // Open connections to forwarder
-    testrig->link1 = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, options->fwdPort);
+    CCNxTestrigLink *linkA = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, options->fwdPort);
     printf("Link 1 created\n");
-    testrig->link2 = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, options->fwdPort + 1);
+    CCNxTestrigLink *linkB = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, options->fwdPort + 1);
     printf("Link 2 created\n");
-    testrig->link3 = ccnxTestrigLink_Listen(options->linkType, "localhost", options->fwdPort + 2);
+    CCNxTestrigLink *linkC = ccnxTestrigLink_Listen(options->linkType, "localhost", options->fwdPort + 2);
     printf("Link 3 created\n");
+
+    // Create the test rig with these links
+    CCNxTestrig *testrig = ccnxTestrig_Create(options, linkA, linkB, linkC);
 
     // Run each test and disply the results
     _ccnxTestrig_TestBasicExchange(testrig);
-    // ...
+    // ... insert other tests here
 
     return 0;
 }
