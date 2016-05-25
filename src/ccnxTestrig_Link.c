@@ -14,7 +14,7 @@
 #include "ccnxTestrig_link.h"
 
 #define MTU 4096
-#define MAX_NUMBER_OF_TCP_CONNECTIONS 2
+#define MAX_NUMBER_OF_TCP_CONNECTIONS 3
 
 struct ccnx_testrig_link {
     CCNxTestrigLinkType type;

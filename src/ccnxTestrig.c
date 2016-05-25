@@ -28,26 +28,31 @@
 #include <ccnx/transport/common/transport_Message.h>
 
 #include "ccnxTestrig_Suite.h"
+#include "ccnxTestrig_Reporter.h"
 
 typedef struct {
     CCNxTestrigLinkType linkType;
+
     char *fwdIPAddress;
     int fwdPort;
 } _CCNxTestrigOptions;
 
 static bool
-__CCNxTestrigOptions_Destructor(_CCNxTestrigOptions **optionsPtr)
+_CCNxTestrigOptions_Destructor(_CCNxTestrigOptions **optionsPtr)
 {
     _CCNxTestrigOptions *options = *optionsPtr;
+
+    free(options->fwdIPAddress);
+
     return true;
 }
 
-parcObject_ImplementAcquire(_CCNxTestrigOptions, _CCNxTestrigOptions);
-parcObject_ImplementRelease(_CCNxTestrigOptions, _CCNxTestrigOptions);
+parcObject_ImplementAcquire(_ccnxTestrigOptions, _CCNxTestrigOptions);
+parcObject_ImplementRelease(_ccnxTestrigOptions, _CCNxTestrigOptions);
 
 parcObject_Override(
 	_CCNxTestrigOptions, PARCObject,
-	.destructor = (PARCObjectDestructor *) __CCNxTestrigOptions_Destructor);
+	.destructor = (PARCObjectDestructor *) _CCNxTestrigOptions_Destructor);
 
 struct ccnx_testrig {
     CCNxTestrigLink *linkA;
@@ -55,6 +60,7 @@ struct ccnx_testrig {
     CCNxTestrigLink *linkC;
 
     _CCNxTestrigOptions *options;
+    CCNxTestrigReporter *reporter;
 };
 
 static bool
@@ -65,6 +71,8 @@ _ccnxTestrig_Destructor(CCNxTestrig **testrigPtr)
     ccnxTestrigLink_Release(&testrig->linkA);
     ccnxTestrigLink_Release(&testrig->linkB);
     ccnxTestrigLink_Release(&testrig->linkC);
+
+    _ccnxTestrigOptions_Release(&testrig->options);
 
     return true;
 }
@@ -77,18 +85,22 @@ parcObject_Override(
 	.destructor = (PARCObjectDestructor *) _ccnxTestrig_Destructor);
 
 CCNxTestrig *
-ccnxTestrig_Create(_CCNxTestrigOptions *options, CCNxTestrigLink *linkA, CCNxTestrigLink *linkB, CCNxTestrigLink *linkC)
+ccnxTestrig_Create(_CCNxTestrigOptions *options)
 {
     CCNxTestrig *testrig = parcObject_CreateInstance(CCNxTestrig);
 
     if (testrig != NULL) {
-        testrig->options = _CCNxTestrigOptions_Acquire(options);
-        testrig->linkA = ccnxTestrigLink_Acquire(linkA);
-        testrig->linkB = ccnxTestrigLink_Acquire(linkB);
-        testrig->linkC = ccnxTestrigLink_Acquire(linkC);
+        testrig->options = _ccnxTestrigOptions_Acquire(options);
+        testrig->reporter = ccnxTestrigReporter_Create(stdout);
     }
 
     return testrig;
+}
+
+CCNxTestrigReporter *
+ccnxTestrig_GetReporter(CCNxTestrig *rig)
+{
+    return rig->reporter;
 }
 
 CCNxTestrigLink *
@@ -169,20 +181,23 @@ main(int argc, char** argv)
     // Parse options and create the test rig
     _CCNxTestrigOptions *options = _ccnxTestrig_ParseCommandLineOptions(argc, argv);
 
-    // Open connections to forwarder
-    CCNxTestrigLink *linkA = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, options->fwdPort);
-    printf("Link 1 created\n");
-    CCNxTestrigLink *linkB = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, options->fwdPort + 1);
-    printf("Link 2 created\n");
-    CCNxTestrigLink *linkC = ccnxTestrigLink_Listen(options->linkType, "localhost", options->fwdPort + 2);
-    printf("Link 3 created\n");
+    // Open connections to the forwarder
+    size_t portNumber = options->fwdPort;
+    CCNxTestrigLink *linkA = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, portNumber++);
+    printf("Link A created\n");
+    CCNxTestrigLink *linkB = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, portNumber++);
+    printf("Link B created\n");
+    CCNxTestrigLink *linkC = ccnxTestrigLink_Listen(options->linkType, "localhost", portNumber++);
+    printf("Link C created\n");
 
-    // Create the test rig with these links
-    CCNxTestrig *testrig = ccnxTestrig_Create(options, linkA, linkB, linkC);
+    // Create the test rig and save the links
+    CCNxTestrig *testrig = ccnxTestrig_Create(options);
+    testrig->linkA = linkA;
+    testrig->linkB = linkB;
+    testrig->linkC = linkC;
 
-    // Run each test and disply the results
-    ccnxTestrigSuite_TestBasicExchange(testrig);
-    // ... insert other tests here
+    // Run every test and disply the results
+    ccnxTestrigSuite_RunAll(testrig);
 
     return 0;
 }

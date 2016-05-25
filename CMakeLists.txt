@@ -16,7 +16,9 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CCNX_TESTRIG_SOURCES
         src/ccnxTestrig_Link.c
         src/ccnxTestrig.c
-        src/ccnxTestrig_Suite.c)
+        src/ccnxTestrig_Suite.c
+        src/ccnxTestrig_Reporter.c
+        src/ccnxTestrigSuiteTestResult.c)
 
 include_directories(${CCNX_HOME}/include)
 
