@@ -1,9 +1,12 @@
 #include "ccnxTestrigSuiteTestResult.h"
 
+#include <parc/algol/parc_LinkedList.h>
+
 struct ccnx_testrig_testresult {
     char *testCase;
     char *reason;
     bool passed;
+    PARCLinkedList *packetList;
 };
 
 static bool
@@ -24,29 +27,32 @@ parcObject_Override(
 	.destructor = (PARCObjectDestructor *) _ccnxTestrigSuiteTestResult_Destructor);
 
 CCNxTestrigSuiteTestResult *
-ccnxTestrigSuiteTestResult_CreatePass(char *testCase)
+ccnxTestrigSuiteTestResult_Create(char *testCase)
 {
     CCNxTestrigSuiteTestResult *result = parcObject_CreateInstance(CCNxTestrigSuiteTestResult);
+
     if (result != NULL) {
         result->testCase = malloc(strlen(testCase));
         strcpy(result->testCase, testCase);
-        result->passed = true;
     }
+
     return result;
 }
 
 CCNxTestrigSuiteTestResult *
-ccnxTestrigSuiteTestResult_CreateFail(char *testCase, char *reason)
+ccnxTestrigSuiteTestResult_SetPass(CCNxTestrigSuiteTestResult *testCase)
 {
-    CCNxTestrigSuiteTestResult *result = parcObject_CreateInstance(CCNxTestrigSuiteTestResult);
-    if (result != NULL) {
-        result->testCase = malloc(strlen(testCase));
-        strcpy(result->testCase, testCase);
-        result->reason = malloc(strlen(reason));
-        strcpy(result->reason, reason);
-        result->passed = false;
-    }
-    return result;
+    testCase->passed = true;
+    return testCase;
+}
+
+CCNxTestrigSuiteTestResult *
+ccnxTestrigSuiteTestResult_SetFail(CCNxTestrigSuiteTestResult *testCase, char *reason)
+{
+    testCase->reason = malloc(strlen(reason));
+    strcpy(testCase->reason, reason);
+    testCase->passed = false;
+    return testCase;
 }
 
 static void
@@ -75,4 +81,10 @@ ccnxTestrigSuiteTestResult_Report(CCNxTestrigSuiteTestResult *result, CCNxTestri
     } else {
         _ccnxTestrigSuiteTestResult_Failed(result, reporter);
     }
+}
+
+void
+ccnxTestrigSuiteTestResult_LogPacket(CCNxTestrigSuiteTestResult *testCase, PARCBuffer *packet)
+{
+    parcLinkedList_Append(testCase->packetList, packet);
 }
