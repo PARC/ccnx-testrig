@@ -96,8 +96,21 @@ _encodeDictionary(const CCNxTlvDictionary *dict)
     parcBuffer_Flip(buffer);
 
     ccnxCodecNetworkBufferIoVec_Release(&iovec);
+    parcSigner_Release(&signer);
 
     return buffer;
+}
+
+static PARCBuffer *
+_computeMessageHash(CCNxTlvDictionary *dictionary)
+{
+    CCNxWireFormatMessageInterface *wireFacade = ccnxWireFormatMessageInterface_GetInterface(dictionary);
+    PARCCryptoHash *hash = wireFacade->computeContentObjectHash(dictionary);
+
+    PARCBuffer *digest = parcBuffer_Acquire(parcCryptoHash_GetDigest(hash));
+    parcCryptoHash_Release(&hash);
+
+    return digest;
 }
 
 static CCNxName *
@@ -739,28 +752,562 @@ ccnxTestrigSuite_ContentObjectTest_5(CCNxTestrig *rig, char *testCaseName)
     return testResult;
 }
 
+// Request object, aggregation with passthrough
+static CCNxTestrigSuiteTestResult *
+ccnxTestrigSuite_ContentObjectTest_6(CCNxTestrig *rig, char *testCaseName)
+{
+    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
+
+    // Create the test packets
+    CCNxName *testName = _createRandomName("ccnx:/test/c");
+    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
+    PARCBuffer *testPayload = parcBuffer_Allocate(1024);
+    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
+
+    // Stamp wire format representations
+    PARCBuffer *interestBuffer = _encodeDictionary(interest);
+    PARCBuffer *contentBuffer = _encodeDictionary(content);
+
+    // Send the interest to the forwarder on link A
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
+
+    // Receive the interest on C
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    if (receivedInterestBuffer == NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
+        return failure;
+    }
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    // Send the interest to the forwarder on link A again and cause passthrough
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
+
+    receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    if (receivedInterestBuffer == NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Received two packets from the forwarder (interests were not aggregated correctly).");
+        return failure;
+    }
+
+    // Verify that the interest is correct
+    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
+    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
+        return failure;
+    }
+    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
+    if (interestError != CCNxInterestFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
+        return failure;
+    }
+
+    // Send the content back to the right downstream link
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
+
+    // Receive the content on link A only
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+
+    CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
+    if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
+        return failure;
+    }
+
+    CCNxContentObject *receivedContent = ccnxMetaMessage_GetContentObject(reconstructedContent);
+    if (_validContentPair(content, receivedContent) != CCNxContentObjectFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
+        return failure;
+    }
+
+    ccnxInterest_Release(&interest);
+    ccnxContentObject_Release(&content);
+
+    parcBuffer_Release(&interestBuffer);
+    parcBuffer_Release(&contentBuffer);
+    parcBuffer_Release(&receivedInterestBuffer);
+    parcBuffer_Release(&receivedContentBuffer);
+
+    ccnxMetaMessage_Release(&reconstructedContent);
+    ccnxInterest_Release(&receivedInterest);
+    ccnxContentObject_Release(&receivedContent);
+
+    ccnxName_Release(&testName);
+    parcBuffer_Release(&testPayload);
+
+    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
+    return testResult;
+}
+
+// Request object, wrong return, self-satisfied
+static CCNxTestrigSuiteTestResult *
+ccnxTestrigSuite_ContentObjectTestErrors_1(CCNxTestrig *rig, char *testCaseName)
+{
+    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
+
+    // Create the test packets
+    CCNxName *testName = _createRandomName("ccnx:/test/b");
+    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
+    PARCBuffer *testPayload = parcBuffer_Allocate(1024);
+    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
+
+    // Stamp wire format representations
+    PARCBuffer *interestBuffer = _encodeDictionary(interest);
+    PARCBuffer *contentBuffer = _encodeDictionary(content);
+
+    // Send the interest to the forwarder on link A
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
+
+    // Receive the interest on C
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    if (receivedInterestBuffer == NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
+        return failure;
+    }
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    // Verify that the interest is correct
+    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
+    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
+        return failure;
+    }
+    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
+    if (interestError != CCNxInterestFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
+        return failure;
+    }
+
+    // Send the content back on the same interest where the content was sent
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), contentBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
+
+    // Attempt to receive the content on link A
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    assertNull(receivedContentBuffer, "Expected nothing to be returned on link A since the interest was self-satisfied");
+
+    ccnxInterest_Release(&interest);
+    ccnxContentObject_Release(&content);
+
+    parcBuffer_Release(&interestBuffer);
+    parcBuffer_Release(&contentBuffer);
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    ccnxInterest_Release(&receivedInterest);
+
+    ccnxName_Release(&testName);
+    parcBuffer_Release(&testPayload);
+
+    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
+    return testResult;
+}
+
+// Request object, wrong return, invalid path
+static CCNxTestrigSuiteTestResult *
+ccnxTestrigSuite_ContentObjectTestErrors_2(CCNxTestrig *rig, char *testCaseName)
+{
+    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
+
+    // Create the test packets
+    CCNxName *testName = _createRandomName("ccnx:/test/b");
+    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
+    PARCBuffer *testPayload = parcBuffer_Allocate(1024);
+    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
+
+    // Stamp wire format representations
+    PARCBuffer *interestBuffer = _encodeDictionary(interest);
+    PARCBuffer *contentBuffer = _encodeDictionary(content);
+
+    // Send the interest to the forwarder on link A
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
+
+    // Receive the interest on C
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    if (receivedInterestBuffer == NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
+        return failure;
+    }
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    // Verify that the interest is correct
+    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
+    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
+        return failure;
+    }
+    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
+    if (interestError != CCNxInterestFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
+        return failure;
+    }
+
+    // Send the content back from link C (the incorrect link)
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
+
+    // Attempt to receive the content on link A
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    assertNull(receivedContentBuffer, "Expected nothing to be returned on link A since the interest was self-satisfied");
+
+    ccnxInterest_Release(&interest);
+    ccnxContentObject_Release(&content);
+
+    parcBuffer_Release(&interestBuffer);
+    parcBuffer_Release(&contentBuffer);
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    ccnxInterest_Release(&receivedInterest);
+
+    ccnxName_Release(&testName);
+    parcBuffer_Release(&testPayload);
+
+    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
+    return testResult;
+}
+
+// Request object, double answer
+static CCNxTestrigSuiteTestResult *
+ccnxTestrigSuite_ContentObjectTestErrors_3(CCNxTestrig *rig, char *testCaseName)
+{
+    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
+
+    // Create the test packets
+    CCNxName *testName = _createRandomName("ccnx:/test/c");
+    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
+    PARCBuffer *testPayload = parcBuffer_Allocate(1024);
+    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
+
+    // Stamp wire format representations
+    PARCBuffer *interestBuffer = _encodeDictionary(interest);
+    PARCBuffer *contentBuffer = _encodeDictionary(content);
+
+    // Send the interest to the forwarder on link A
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
+
+    // Receive the interest on C
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    if (receivedInterestBuffer == NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
+        return failure;
+    }
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    // Verify that the interest is correct
+    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
+    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
+        return failure;
+    }
+    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
+    if (interestError != CCNxInterestFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
+        return failure;
+    }
+
+    // Send the content back from link C
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
+
+    // Attempt to receive the content on link A
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
+    if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
+        return failure;
+    }
+
+    CCNxContentObject *receivedContent = ccnxMetaMessage_GetContentObject(reconstructedContent);
+    if (_validContentPair(content, receivedContent) != CCNxContentObjectFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
+        return failure;
+    }
+
+    parcBuffer_Release(&receivedContentBuffer);
+
+    // Send the content back from link C again
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
+
+    // Test that the content is not forwarded twice
+    receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    assertNull(receivedContentBuffer, "Expected nothing to be returned on link A since the interest was self-satisfied");
+
+    ccnxInterest_Release(&interest);
+    ccnxContentObject_Release(&content);
+
+    parcBuffer_Release(&interestBuffer);
+    parcBuffer_Release(&contentBuffer);
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    ccnxInterest_Release(&receivedInterest);
+
+    ccnxName_Release(&testName);
+    parcBuffer_Release(&testPayload);
+
+    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
+    return testResult;
+}
+
+// Request object with hash restriction
+static CCNxTestrigSuiteTestResult *
+ccnxTestrigSuite_ContentObjectTestRestrictions_1(CCNxTestrig *rig, char *testCaseName)
+{
+    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
+
+    // Create the test packets
+    CCNxName *testName = _createRandomName("ccnx:/test/c");
+    PARCBuffer *testPayload = parcBuffer_Allocate(1024);
+    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
+    PARCBuffer *hash = _computeMessageHash(content);
+
+    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, hash);
+
+    // Stamp wire format representations
+    PARCBuffer *interestBuffer = _encodeDictionary(interest);
+    PARCBuffer *contentBuffer = _encodeDictionary(content);
+
+    // Send the interest to the forwarder on link A
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
+
+    // Receive the interest on C
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    if (receivedInterestBuffer == NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
+        return failure;
+    }
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    // Verify that the interest is correct
+    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
+    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
+        return failure;
+    }
+    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
+    if (interestError != CCNxInterestFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
+        return failure;
+    }
+
+    // Send the content back from link C
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
+
+    // Attempt to receive the content on link A
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
+    if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
+        return failure;
+    }
+
+    CCNxContentObject *receivedContent = ccnxMetaMessage_GetContentObject(reconstructedContent);
+    if (_validContentPair(content, receivedContent) != CCNxContentObjectFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
+        return failure;
+    }
+
+    ccnxInterest_Release(&interest);
+    ccnxContentObject_Release(&content);
+
+    parcBuffer_Release(&interestBuffer);
+    parcBuffer_Release(&contentBuffer);
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    ccnxInterest_Release(&receivedInterest);
+
+    ccnxName_Release(&testName);
+    parcBuffer_Release(&testPayload);
+
+    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
+    return testResult;
+}
+
+// Request object with KeyId restriction
+static CCNxTestrigSuiteTestResult *
+ccnxTestrigSuite_ContentObjectTestRestrictions_2(CCNxTestrig *rig, char *testCaseName)
+{
+    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
+
+    // Create the test packets
+    CCNxName *testName = _createRandomName("ccnx:/test/c");
+    PARCBuffer *testPayload = parcBuffer_Allocate(1024);
+    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
+
+    PARCBuffer *signatureBits = parcBuffer_Allocate(10); // arbitrary bufer size -- not important
+    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARC_HASH_SHA256, signatureBits);
+    PARCBuffer *keyId = parcBuffer_Allocate(32);
+
+    CCNxName *locatorName = ccnxName_CreateFromCString("ccnx:/key/locator");
+    CCNxLink *keyURILink = ccnxLink_Create(locatorName, NULL, NULL);
+    CCNxKeyLocator *keyLocator = ccnxKeyLocator_CreateFromKeyLink(keyURILink);
+
+    ccnxContentObject_SetSignature(content, keyId, signature, keyLocator);
+
+    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, keyId, NULL);
+
+    // Stamp wire format representations
+    PARCBuffer *interestBuffer = _encodeDictionary(interest);
+    PARCBuffer *contentBuffer = _encodeDictionary(content);
+
+    // Send the interest to the forwarder on link A
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
+
+    // Receive the interest on C
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    if (receivedInterestBuffer == NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
+        return failure;
+    }
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    // Verify that the interest is correct
+    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
+    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
+        return failure;
+    }
+    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
+    if (interestError != CCNxInterestFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
+        return failure;
+    }
+
+    // Send the content back from link C
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
+
+    // Attempt to receive the content on link A
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
+    if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
+        return failure;
+    }
+
+    CCNxContentObject *receivedContent = ccnxMetaMessage_GetContentObject(reconstructedContent);
+    if (_validContentPair(content, receivedContent) != CCNxContentObjectFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
+        return failure;
+    }
+
+    ccnxInterest_Release(&interest);
+    ccnxContentObject_Release(&content);
+
+    parcBuffer_Release(&interestBuffer);
+    parcBuffer_Release(&contentBuffer);
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    ccnxInterest_Release(&receivedInterest);
+
+    ccnxName_Release(&testName);
+    parcBuffer_Release(&testPayload);
+
+    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
+    return testResult;
+}
+
+
+
+// Request object with hash restriction (invalid)
+static CCNxTestrigSuiteTestResult *
+ccnxTestrigSuite_ContentObjectTestRestrictionErrors_1(CCNxTestrig *rig, char *testCaseName)
+{
+    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
+
+    // Create the test packets
+    CCNxName *testName = _createRandomName("ccnx:/test/c");
+    PARCBuffer *testPayload = parcBuffer_Allocate(1024);
+    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
+
+    PARCBuffer *hash = parcBuffer_Allocate(32); // this won't match the hash of the content object above
+    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, hash);
+
+    // Stamp wire format representations
+    PARCBuffer *interestBuffer = _encodeDictionary(interest);
+    PARCBuffer *contentBuffer = _encodeDictionary(content);
+
+    // Send the interest to the forwarder on link A
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
+
+    // Receive the interest on C
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    if (receivedInterestBuffer == NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
+        return failure;
+    }
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    // Verify that the interest is correct
+    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
+    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
+        return failure;
+    }
+    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
+    if (interestError != CCNxInterestFieldError_None) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
+        return failure;
+    }
+
+    // Send the content back from link C
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
+
+    // Attempt to receive the content on link A
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    if (receivedContentBuffer != NULL) {
+        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Should not receive a response since the hash digest did not match.");
+        return failure;
+    }
+
+    ccnxInterest_Release(&interest);
+    ccnxContentObject_Release(&content);
+
+    parcBuffer_Release(&interestBuffer);
+    parcBuffer_Release(&contentBuffer);
+    parcBuffer_Release(&receivedInterestBuffer);
+
+    ccnxInterest_Release(&receivedInterest);
+
+    ccnxName_Release(&testName);
+    parcBuffer_Release(&testPayload);
+
+    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
+    return testResult;
+}
+
+
+
 static char *_testCaseNames[CCNxTestrigSuiteTest_LastEntry] = {
     "CCNxTestrigSuiteTest_FIBTest_BasicInterest_1a",
     "CCNxTestrigSuiteTest_FIBTest_BasicInterest_1b",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_1c",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_1d",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_1e",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_1f",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_2a",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_2b",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_2c",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_3a",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_3b",
-    "CCNxTestrigSuiteTest_FIBTest_BasicInterest_3c",
-    "CCNxTestrigSuiteTest_PITTest_1",
-    "CCNxTestrigSuiteTest_CSTest_1",
-    "CCNxTestrigSuiteTest_RequestTest_Standard_1",
-    "CCNxTestrigSuiteTest_RequestTest_Errors_1",
-    "CCNxTestrigSuiteTest_RequestTest_Restrictions_1",
     "CCNxTestrigSuiteTest_ContentObjectTest_1",
     "CCNxTestrigSuiteTest_ContentObjectTest_2",
     "CCNxTestrigSuiteTest_ContentObjectTest_3",
-    "CCNxTestrigSuiteTest_ContentObjectTest_4"
+    "CCNxTestrigSuiteTest_ContentObjectTest_4",
+    "CCNxTestrigSuiteTest_ContentObjectTest_5",
+    "CCNxTestrigSuiteTest_ContentObjectTest_6",
+    "CCNxTestrigSuiteTest_ContentObjectErrors_1",
+    "CCNxTestrigSuiteTest_ContentObjectErrors_2",
+    "CCNxTestrigSuiteTest_ContentObjectErrors_3",
+    "CCNxTestrigSuiteTest_ContentObjectRestrictions_1",
+    "CCNxTestrigSuiteTest_ContentObjectRestrictions_2",
+    "CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_1",
 };
 
 CCNxTestrigSuiteTestResult *
@@ -771,6 +1318,9 @@ ccnxTestrigSuite_RunTest(CCNxTestrig *rig, CCNxTestrigSuiteTest test)
     switch (test) {
         case CCNxTestrigSuiteTest_FIBTest_BasicInterest_1a:
             result = ccnxTestrigSuite_FIBTest_BasicInterest_1a(rig, _testCaseNames[test]);
+            break;
+        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_1b:
+            result = ccnxTestrigSuite_FIBTest_BasicInterest_1b(rig, _testCaseNames[test]);
             break;
         case CCNxTestrigSuiteTest_ContentObjectTest_1:
             result = ccnxTestrigSuite_ContentObjectTest_1(rig, _testCaseNames[test]);
@@ -784,24 +1334,32 @@ ccnxTestrigSuite_RunTest(CCNxTestrig *rig, CCNxTestrigSuiteTest test)
         case CCNxTestrigSuiteTest_ContentObjectTest_4:
             result = ccnxTestrigSuite_ContentObjectTest_4(rig, _testCaseNames[test]);
             break;
-
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_1b:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_1c:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_1d:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_1e:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_1f:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_2a:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_2b:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_2c:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_3a:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_3b:
-        case CCNxTestrigSuiteTest_FIBTest_BasicInterest_3c:
-        case CCNxTestrigSuiteTest_PITTest_1:
-        case CCNxTestrigSuiteTest_CSTest_1:
-        case CCNxTestrigSuiteTest_RequestTest_Standard_1:
-        case CCNxTestrigSuiteTest_RequestTest_Errors_1:
-        case CCNxTestrigSuiteTest_RequestTest_Restrictions_1:
+        case CCNxTestrigSuiteTest_ContentObjectTest_5:
+            result = ccnxTestrigSuite_ContentObjectTest_5(rig, _testCaseNames[test]);
+            break;
+        case CCNxTestrigSuiteTest_ContentObjectTest_6:
+            result = ccnxTestrigSuite_ContentObjectTest_6(rig, _testCaseNames[test]);
+            break;
+        case CCNxTestrigSuiteTest_ContentObjectErrors_1:
+            result = ccnxTestrigSuite_ContentObjectTestErrors_1(rig, _testCaseNames[test]);
+            break;
+        case CCNxTestrigSuiteTest_ContentObjectErrors_2:
+            result = ccnxTestrigSuite_ContentObjectTestErrors_2(rig, _testCaseNames[test]);
+            break;
+        case CCNxTestrigSuiteTest_ContentObjectErrors_3:
+            result = ccnxTestrigSuite_ContentObjectTestErrors_3(rig, _testCaseNames[test]);
+            break;
+        case CCNxTestrigSuiteTest_ContentObjectRestrictions_1:
+            result = ccnxTestrigSuite_ContentObjectTestRestrictions_1(rig, _testCaseNames[test]);
+            break;
+        case CCNxTestrigSuiteTest_ContentObjectRestrictions_2:
+            result = ccnxTestrigSuite_ContentObjectTestRestrictions_2(rig, _testCaseNames[test]);
+            break;
+        case CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_1:
+            result = ccnxTestrigSuite_ContentObjectTestRestrictionErrors_1(rig, _testCaseNames[test]);
+            break;
         default:
+            fprintf(stderr, "Error: unsupported test case: %d", test);
             break;
     }
 

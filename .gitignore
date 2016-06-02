@@ -71,3 +71,6 @@ cmake_install.cmake
 
 # Binaries
 ccnxTestrig
+
+# CLion
+.idea/

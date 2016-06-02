@@ -14,7 +14,9 @@ _ccnxTestrigSuiteTestResult_Destructor(CCNxTestrigSuiteTestResult **resultPtr)
 {
     CCNxTestrigSuiteTestResult *result = *resultPtr;
 
-    // TODO
+    if (result->packetList != NULL) {
+        parcLinkedList_Release(&(result->packetList));
+    }
 
     return true;
 }

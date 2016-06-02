@@ -296,12 +296,6 @@ ccnxTestrigLink_Connect(CCNxTestrigLinkType type, char *address, int port)
     }
 }
 
-// void
-// ccnxTestrigLink_SetTimeout(CCNxTestrigLink *link, struct timeval tv)
-// {
-//     setsockopt(link->socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval));
-// }
-
 PARCBuffer *
 ccnxTestrigLink_Receive(CCNxTestrigLink *link)
 {

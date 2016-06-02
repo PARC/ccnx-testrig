@@ -25,8 +25,6 @@ void ccnxTestrigLink_Release(CCNxTestrigLink **linkPtr);
 CCNxTestrigLink *ccnxTestrigLink_Listen(CCNxTestrigLinkType type, char *address, int port);
 CCNxTestrigLink *ccnxTestrigLink_Connect(CCNxTestrigLinkType type, char *address, int port);
 
-// void ccnxTestrigLink_SetTimeout(CCNxTestrigLink *link, struct timeval tv);
-
 PARCBuffer *ccnxTestrigLink_Receive(CCNxTestrigLink *link);
 PARCBuffer *ccnxTestrigLink_ReceiveWithTimeout(CCNxTestrigLink *link, int timeout);
 int ccnxTestrigLink_Send(CCNxTestrigLink *link, PARCBuffer *buffer);
