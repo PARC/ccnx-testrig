@@ -18,7 +18,14 @@ typedef enum {
     CCNxTestrigSuiteTest_ContentObjectErrors_3,
     CCNxTestrigSuiteTest_ContentObjectRestrictions_1,
     CCNxTestrigSuiteTest_ContentObjectRestrictions_2,
+    CCNxTestrigSuiteTest_ContentObjectRestrictions_3,
+    CCNxTestrigSuiteTest_ContentObjectRestrictions_4,
     CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_1,
+    CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_2,
+    CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_3,
+    CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_4,
+    CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_5,
+    CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_6,
     CCNxTestrigSuiteTest_LastEntry
 } CCNxTestrigSuiteTest;
 
