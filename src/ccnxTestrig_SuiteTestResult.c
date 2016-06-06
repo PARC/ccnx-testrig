@@ -1,4 +1,4 @@
-#include "ccnxTestrigSuiteTestResult.h"
+#include "ccnxTestrig_SuiteTestResult.h"
 
 #include <parc/algol/parc_LinkedList.h>
 

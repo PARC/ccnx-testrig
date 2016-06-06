@@ -2,12 +2,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/resource.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <errno.h>
 #include <getopt.h>
 
 #include <stdbool.h>
@@ -30,11 +24,14 @@
 #include "ccnxTestrig_Suite.h"
 #include "ccnxTestrig_Reporter.h"
 
+#define DEFAULT_PORT 9596
+#define DEFAULT_ADDRESS "localhost"
+
 typedef struct {
     CCNxTestrigLinkType linkType;
 
-    char *fwdIPAddress;
-    int fwdPort;
+    char *address;
+    int port;
 } _CCNxTestrigOptions;
 
 static bool
@@ -42,7 +39,7 @@ _CCNxTestrigOptions_Destructor(_CCNxTestrigOptions **optionsPtr)
 {
     _CCNxTestrigOptions *options = *optionsPtr;
 
-    free(options->fwdIPAddress);
+    free(options->address);
 
     return true;
 }
@@ -104,6 +101,21 @@ ccnxTestrig_GetReporter(CCNxTestrig *rig)
 }
 
 CCNxTestrigLink *
+ccnxTestrig_GetLinkByID(CCNxTestrig *rig, CCNxTestrigLinkID linkID)
+{
+    switch (linkID) {
+        case CCNxTestrigLinkID_LinkA:
+            return ccnxTestrig_GetLinkA(rig);
+        case CCNxTestrigLinkID_LinkB:
+            return ccnxTestrig_GetLinkB(rig);
+        case CCNxTestrigLinkID_LinkC:
+            return ccnxTestrig_GetLinkC(rig);
+    }
+
+    return NULL;
+}
+
+CCNxTestrigLink *
 ccnxTestrig_GetLinkA(CCNxTestrig *rig)
 {
     return rig->linkA;
@@ -124,8 +136,10 @@ ccnxTestrig_GetLinkC(CCNxTestrig *rig)
 void
 showUsage()
 {
-    printf("Usage: ccnxTestrig <options> <FWD IP address> <port>\n");
-    printf(" -t       --transport         Transport mechanism (0 = UDP, 1 = TCP, 2 = ETH)\n");
+    printf("Usage: ccnxTestrig [-h] [-t (UDP | TCP)] [-a <local address>] [-p <local port>] \n");
+    printf(" -a       --address           Local IP address (localhost by default)\n");
+    printf(" -p       --port              Local IP port (9596 by defualt)\n");
+    printf(" -t       --transport         Transport mechanism (0 = UDP, 1 = TCP)\n");
     printf(" -h       --help              Display the help message\n");
 }
 
@@ -133,10 +147,11 @@ static _CCNxTestrigOptions *
 _ccnxTestrig_ParseCommandLineOptions(int argc, char **argv)
 {
     static struct option longopts[] = {
-            { "transport",  required_argument,  NULL,'t' },
-            // { "window",     required_argument,  NULL,'w'},
-            { "help",       no_argument,        NULL,'h'},
-            { NULL,0,NULL,0}
+            { "address",    required_argument,  NULL, 'a'},
+            { "port",       required_argument,  NULL, 'p'},
+            { "transport",  required_argument,  NULL, 't' },
+            { "help",       no_argument,        NULL, 'h'},
+            { NULL,         0,                  NULL, 0}
     };
 
     if (argc < 2) {
@@ -145,15 +160,22 @@ _ccnxTestrig_ParseCommandLineOptions(int argc, char **argv)
     }
 
     _CCNxTestrigOptions *options = parcObject_CreateInstance(_CCNxTestrigOptions);
-    options->fwdPort = 0;
-    options->fwdIPAddress = NULL;
+    options->port = 0;
+    options->address = NULL;
 
     int c;
     while (optind < argc) {
-        if ((c = getopt_long(argc, argv, "ht:", longopts, NULL)) != -1) {
+        if ((c = getopt_long(argc, argv, "ht:a:p:", longopts, NULL)) != -1) {
             switch(c) {
                 case 't':
                     sscanf(optarg, "%zu", (size_t *) &(options->linkType));
+                    break;
+                case 'a':
+                    options->address = malloc(strlen(optarg));
+                    strcpy(options->address, optarg);
+                    break;
+                case 'p':
+                    sscanf(optarg, "%zu", (size_t *) &(options->port));
                     break;
                 case 'h':
                     showUsage();
@@ -161,15 +183,16 @@ _ccnxTestrig_ParseCommandLineOptions(int argc, char **argv)
                 default:
                     break;
             }
-        } else { // handle the rest of the mandatory options
-            asprintf(&(options->fwdIPAddress), "%s", argv[optind++]);
-            options->fwdPort = atoi(argv[optind++]);
         }
     }
 
-    if (options->fwdPort == 0 || options->fwdIPAddress == NULL) {
-        showUsage();
-        exit(EXIT_FAILURE);
+    // Configure the defaults.
+    if (options->port == 0) {
+        options->port = DEFAULT_PORT;
+    }
+    if (options->address == NULL) {
+        options->address = malloc(strlen(DEFAULT_ADDRESS));
+        strcpy(options->address, DEFAULT_ADDRESS);
     }
 
     return options;
@@ -182,12 +205,13 @@ main(int argc, char** argv)
     _CCNxTestrigOptions *options = _ccnxTestrig_ParseCommandLineOptions(argc, argv);
 
     // Open connections to the forwarder
-    size_t portNumber = options->fwdPort;
-    CCNxTestrigLink *linkA = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, portNumber++);
+    size_t portNumber = options->port;
+    char *address = options->address;
+    CCNxTestrigLink *linkA = ccnxTestrigLink_Listen(options->linkType, address, portNumber++);
     printf("Link A created\n");
-    CCNxTestrigLink *linkB = ccnxTestrigLink_Connect(options->linkType, options->fwdIPAddress, portNumber++);
+    CCNxTestrigLink *linkB = ccnxTestrigLink_Listen(options->linkType, address, portNumber++);
     printf("Link B created\n");
-    CCNxTestrigLink *linkC = ccnxTestrigLink_Listen(options->linkType, "localhost", portNumber++);
+    CCNxTestrigLink *linkC = ccnxTestrigLink_Listen(options->linkType, address, portNumber++);
     printf("Link C created\n");
 
     // Create the test rig and save the links

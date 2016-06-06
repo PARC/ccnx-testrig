@@ -15,7 +15,6 @@ typedef struct ccnx_testrig_link CCNxTestrigLink;
 typedef enum {
     CCNxTestrigLinkType_UDP = 0,
     CCNxTestrigLinkType_TCP = 1,
-    CCNxTestrigLinkType_ETH = 2,
     CCNxTestrigLinkType_Invalid = 3
 } CCNxTestrigLinkType;
 

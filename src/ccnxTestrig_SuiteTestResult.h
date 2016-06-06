@@ -9,6 +9,7 @@ typedef struct ccnx_testrig_testresult CCNxTestrigSuiteTestResult;
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_Create(char *testCase);
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_SetPass(CCNxTestrigSuiteTestResult *testCase);
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_SetFail(CCNxTestrigSuiteTestResult *testCase, char *reason);
+
 void ccnxTestrigSuiteTestResult_LogPacket(CCNxTestrigSuiteTestResult *testCase, PARCBuffer *packet);
 void ccnxTestrigSuiteTestResult_Report(CCNxTestrigSuiteTestResult *result, CCNxTestrigReporter *reporter);
 

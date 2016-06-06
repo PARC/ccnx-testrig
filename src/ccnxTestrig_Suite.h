@@ -2,7 +2,7 @@
 #define ccnx_testrig_suite_h
 
 #include "ccnxTestrig.h"
-#include "ccnxTestrigSuiteTestResult.h"
+#include "ccnxTestrig_SuiteTestResult.h"
 
 typedef enum {
     CCNxTestrigSuiteTest_FIBTest_BasicInterest_1a,
@@ -29,6 +29,7 @@ typedef enum {
     CCNxTestrigSuiteTest_LastEntry
 } CCNxTestrigSuiteTest;
 
+// TODO: return a list of (CCNxTestrigSuiteTestResult *)'s
 void ccnxTestrigSuite_RunAll(CCNxTestrig *rig);
 CCNxTestrigSuiteTestResult *ccnxTestrigSuite_RunTest(CCNxTestrig *rig, CCNxTestrigSuiteTest test);
 

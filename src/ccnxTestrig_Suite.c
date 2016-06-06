@@ -17,6 +17,8 @@
 
 #include "ccnxTestrig.h"
 #include "ccnxTestrig_Suite.h"
+#include "ccnxTestrig_SuiteTestResult.h"
+#include "ccnxTestrig_Script.h"
 
 typedef enum {
     CCNxInterestFieldError_Name,
