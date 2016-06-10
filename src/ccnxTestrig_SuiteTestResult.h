@@ -10,6 +10,8 @@ CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_Create(char *testCase);
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_SetPass(CCNxTestrigSuiteTestResult *testCase);
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_SetFail(CCNxTestrigSuiteTestResult *testCase, char *reason);
 
+bool ccnxTestrigSuiteTestResult_IsFailure(CCNxTestrigSuiteTestResult *testCase);
+
 void ccnxTestrigSuiteTestResult_LogPacket(CCNxTestrigSuiteTestResult *testCase, PARCBuffer *packet);
 void ccnxTestrigSuiteTestResult_Report(CCNxTestrigSuiteTestResult *result, CCNxTestrigReporter *reporter);
 

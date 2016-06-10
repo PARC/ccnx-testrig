@@ -83,7 +83,7 @@ static PARCBuffer *
 _encodeDictionary(const CCNxTlvDictionary *dict)
 {
     PARCSigner *signer = ccnxValidationCRC32C_CreateSigner();
-    CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode((CCNxTlvDictionary *) dict, signer);
+    CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode((CCNxTlvDictionary *) dict, signer, NULL);
     const struct iovec *array = ccnxCodecNetworkBufferIoVec_GetArray(iovec);
     size_t iovcnt = ccnxCodecNetworkBufferIoVec_GetCount((CCNxCodecNetworkBufferIoVec *) iovec);
 

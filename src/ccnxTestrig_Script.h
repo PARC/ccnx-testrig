@@ -15,8 +15,9 @@ typedef struct ccnx_testrig_script_step CCNxTestrigScriptStep;
 
 CCNxTestrigScript *ccnxTestrigScript_Create(char *testCase);
 
-CCNxTestrigScriptStep *ccnxTestrigScript_AddSendStep(CCNxTestrigLinkID linkId, CCNxTlvDictionary *messageDictionary);
-CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveStep(CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, bool assertNull, char *failureMessage);
+CCNxTestrigScriptStep *ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTlvDictionary *messageDictionary);
+CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage);
+CCNxTestrigScriptStep *ccnxTestrigScript_AddNullReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage);
 
 CCNxTestrigSuiteTestResult *ccnxTestrigScript_Execute(CCNxTestrigScript *script, CCNxTestrig *rig);
 

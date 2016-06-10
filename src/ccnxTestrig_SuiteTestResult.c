@@ -85,6 +85,12 @@ ccnxTestrigSuiteTestResult_Report(CCNxTestrigSuiteTestResult *result, CCNxTestri
     }
 }
 
+bool
+ccnxTestrigSuiteTestResult_IsFailure(CCNxTestrigSuiteTestResult *testCase)
+{
+    return !testCase->passed;
+}
+
 void
 ccnxTestrigSuiteTestResult_LogPacket(CCNxTestrigSuiteTestResult *testCase, PARCBuffer *packet)
 {

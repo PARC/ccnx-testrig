@@ -19,7 +19,8 @@ set(CCNX_TESTRIG_SOURCES
         src/ccnxTestrig.c
         src/ccnxTestrig_Suite.c
         src/ccnxTestrig_Script.c
-        src/ccnxTestrig_SuiteTestResult.c)
+        src/ccnxTestrig_SuiteTestResult.c
+        src/ccnxTestrig_PacketUtility.c)
 
 include_directories(${CCNX_HOME}/include)
 
