@@ -1,3 +1,6 @@
+#include "ccnxTestrig_PacketUtility.h"
+#include "ccnxTestrig_SuiteTestResult.h"
+
 static CCNxInterestFieldError
 _validInterestPair(CCNxInterest *egress, CCNxInterest *ingress)
 {
@@ -40,19 +43,19 @@ CCNxTestrigSuiteTestResult *
 ccnxTestrigPacketUtility_IsValidPacketPair(CCNxTlvDictionary *sent, CCNxMetaMessage *received, CCNxTestrigSuiteTestResult *result)
 {
     if (ccnxTlvDictionary_IsInterest(sent)) {
-        CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
+        CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(received);
         if (_validInterestPair(sent, receivedInterest) != CCNxInterestFieldError_None) {
-            result = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
+            result = ccnxTestrigSuiteTestResult_SetFail(result, "An interest field was incorrect");
         }
     } else if (ccnxTlvDictionary_IsContentObject(sent)) {
         CCNxContentObject *receivedContent = ccnxMetaMessage_GetContentObject(received);
         if (_validContentPair(sent, received) != CCNxContentObjectFieldError_None) {
-            result = ccnxTestrigSuiteTestResult_SetFail(testCase, "A content object field was incorrect");
+            result = ccnxTestrigSuiteTestResult_SetFail(result, "A content object field was incorrect");
         }
     } else if (ccnxTlvDictionary_IsManifest(sent)) {
         CCNxManifest *receivedManifest = ccnxMetaMessage_GetManifest(received);
-        if (_validManifestPair(manifest, receivedManifest) != CCNxManifestFieldError_None) {
-            result = ccnxTestrigSuiteTestResult_SetFail(testCase, "A manifest field was incorrect.");
+        if (_validManifestPair(sent, receivedManifest) != CCNxManifestFieldError_None) {
+            result = ccnxTestrigSuiteTestResult_SetFail(result, "A manifest field was incorrect.");
         }
     } else {
         ccnxTestrigSuiteTestResult_SetFail(result, "The sent and received packet pair did not have the same message type.");

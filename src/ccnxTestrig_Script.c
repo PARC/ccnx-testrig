@@ -1,7 +1,16 @@
 #include "ccnxTestrig_SuiteTestResult.h"
 #include "ccnxTestrig_Script.h"
+#include "ccnxTestrig_PacketUtility.h"
 
 #include <parc/algol/parc_LinkedList.h>
+
+#include <ccnx/common/ccnx_Name.h>
+#include <ccnx/common/ccnx_Interest.h>
+#include <ccnx/common/ccnx_ContentObject.h>
+#include <ccnx/common/ccnx_Manifest.h>
+
+#include <ccnx/transport/common/transport_MetaMessage.h>
+#include <ccnx/transport/common/transport_Message.h>
 
 struct ccnx_testrig_script {
     char *testCase;
@@ -112,18 +121,18 @@ CCNxTestrigScriptStep *
 ccnxTestrigScript_AddReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage)
 {
     size_t index = parcLinkedList_Size(script->steps);
-    CCNxTestrigScriptStep *step = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, messageDictionary, false, failureMessage);
-    parcLinkedList_Append(script->steps, step);
-    return step;
+    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, NULL, step, false, failureMessage);
+    parcLinkedList_Append(script->steps, newStep);
+    return newStep;
 }
 
 CCNxTestrigScriptStep *
 ccnxTestrigScript_AddNullReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage)
 {
     size_t index = parcLinkedList_Size(script->steps);
-    CCNxTestrigScriptStep *step = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, messageDictionary, true, failureMessage);
-    parcLinkedList_Append(script->steps, step);
-    return step;
+    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, NULL, step, true, failureMessage);
+    parcLinkedList_Append(script->steps, newStep);
+    return newStep;
 }
 
 static PARCBuffer *
@@ -185,16 +194,16 @@ _ccnxTestrigScript_ExecuteReceiveStep(CCNxTestrigScript *script, CCNxTestrigScri
         return result;
     }
 
-    return _ccnxTestrigPacketUtility_IsValidPacketPair(referencedMessage, reconstructedMessage);
+    return ccnxTestrigPacketUtility_IsValidPacketPair(referencedMessage, reconstructedMessage, result);
 }
 
 static CCNxTestrigSuiteTestResult *
-_ccnxTestrigScript_ExecuteStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTestrig *rig)
+_ccnxTestrigScript_ExecuteStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
 {
     if (step->send) {
-        return _ccnxTestrigScript_ExecuteSendStep(script, step, rig);
+        return _ccnxTestrigScript_ExecuteSendStep(script, step, result, rig);
     } else {
-        return _ccnxTestrigScript_ExecuteReceiveStep(script, step, rig);
+        return _ccnxTestrigScript_ExecuteReceiveStep(script, step, result, rig);
     }
 }
 
@@ -202,17 +211,17 @@ CCNxTestrigSuiteTestResult *
 ccnxTestrigScript_Execute(CCNxTestrigScript *script, CCNxTestrig *rig)
 {
     size_t numSteps = parcLinkedList_Size(script->steps);
-    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
+    CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create(script->testCase);
 
     for (size_t i = 0; i < numSteps; i++) {
-        CCNxTestrigScriptStep *step = parcLinkedList_Get(script->steps, i);
-        testCaseResult = _ccnxTestrigScript_ExecuteStep(script, step, testCaseResult, rig);
+        CCNxTestrigScriptStep *step = parcLinkedList_GetAtIndex(script->steps, i);
+        result = _ccnxTestrigScript_ExecuteStep(script, step, result, rig);
 
         // If the last step failed, stop the test and return the failure.
-        if (ccnxTestrigSuiteTestResult_IsFailure(testCaseResult)) {
-            return testCaseResult;
+        if (ccnxTestrigSuiteTestResult_IsFailure(result)) {
+            return result;
         }
     }
 
-    return ccnxTestrigSuiteTestResult_SetPass(testCaseResult);
+    return ccnxTestrigSuiteTestResult_SetPass(result);
 }

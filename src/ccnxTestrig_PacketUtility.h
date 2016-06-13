@@ -3,6 +3,9 @@
 
 #include "ccnxTestrig_SuiteTestResult.h"
 
+#include <ccnx/transport/common/transport_MetaMessage.h>
+#include <ccnx/transport/common/transport_Message.h>
+
 typedef enum {
     CCNxInterestFieldError_Name,
     CCNxInterestFieldError_Lifetime,
