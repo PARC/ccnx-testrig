@@ -131,14 +131,26 @@ ${PARC_PUBLICKEY} -c ${KEYFILE} ${PASSWORD} athena 1024 365
 ${ATHENA} -c tcp://localhost:${PORT}/listener 2>&1 > ${ATHENA_LOGFILE} &
 trap "kill -HUP $!" INT
 
-# Create the three links.
+# Define the A, B, C port values.
 PORTA=$((PORT+1))
 PORTB=$((PORT+2))
 PORTC=$((PORT+3))
-${ATHENACTL} -a tcp://localhost:${PORT} add link tcp://`uname -n`:${PORTA}/listener/${NOTLOCAL}/name=athena${PORTA}
-${ATHENACTL} -a tcp://localhost:${PORT} add link tcp://`uname -n`:${PORTB}/listener/${NOTLOCAL}/name=athena${PORTB}
-${ATHENACTL} -a tcp://localhost:${PORT} add link tcp://`uname -n`:${PORTC}/listener/${NOTLOCAL}/name=athena${PORTC}
+
+# Connect to the test rig.
+${ATHENACTL} -a tcp://localhost:${PORT} add link tcp://`uname -n`:${PORTA}/${NOTLOCAL}/name=athena${PORTA}
+echo "Created link A"
+read line
+${ATHENACTL} -a tcp://localhost:${PORT} add link tcp://`uname -n`:${PORTB}/${NOTLOCAL}/name=athena${PORTB}
+echo "Created link B"
+read line
+${ATHENACTL} -a tcp://localhost:${PORT} add link tcp://`uname -n`:${PORTC}/${NOTLOCAL}/name=athena${PORTC}
+echo "Created link C"
+read line
 ${ATHENACTL} -a tcp://localhost:${PORT} set level ${LOGLEVEL}
+
+echo "Start the test rig and connect to the forwarder"
+read line
+echo "Configuring the FIB routes"
 
 # Create the necessary routes.
 ${ATHENACTL} -a tcp://localhost:${PORT} add route athena${PORTA} ccnx:/test/a

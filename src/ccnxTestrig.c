@@ -205,14 +205,17 @@ main(int argc, char** argv)
     _CCNxTestrigOptions *options = _ccnxTestrig_ParseCommandLineOptions(argc, argv);
 
     // Open connections to the forwarder
-    size_t portNumber = options->port;
+    int portNumber = options->port;
     char *address = options->address;
     CCNxTestrigLink *linkA = ccnxTestrigLink_Listen(options->linkType, address, portNumber++);
-    printf("Link A created\n");
+    printf("Link A created at %s:%04d\n", address, portNumber - 1);
     CCNxTestrigLink *linkB = ccnxTestrigLink_Listen(options->linkType, address, portNumber++);
-    printf("Link B created\n");
+    printf("Link B created at %s:%04d\n", address, portNumber - 1);
     CCNxTestrigLink *linkC = ccnxTestrigLink_Listen(options->linkType, address, portNumber++);
-    printf("Link C created\n");
+    printf("Link C created at %s:%04d\n", address, portNumber - 1);
+
+    printf("Configure routes on the forwarder...\n");
+    getc(stdin);
 
     // Create the test rig and save the links
     CCNxTestrig *testrig = ccnxTestrig_Create(options);

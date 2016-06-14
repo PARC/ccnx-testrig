@@ -1,6 +1,8 @@
 #include "ccnxTestrig_PacketUtility.h"
 #include "ccnxTestrig_SuiteTestResult.h"
 
+#include <ccnx/common/codec/ccnxCodec_TlvPacket.h>
+
 static CCNxInterestFieldError
 _validInterestPair(CCNxInterest *egress, CCNxInterest *ingress)
 {
@@ -62,4 +64,27 @@ ccnxTestrigPacketUtility_IsValidPacketPair(CCNxTlvDictionary *sent, CCNxMetaMess
     }
 
     return result;
+}
+
+PARCBuffer *
+ccnxTestrigPacketUtility_EncodePacket(CCNxTlvDictionary *dict)
+{
+    CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode(dict, NULL);
+
+    const struct iovec *array = ccnxCodecNetworkBufferIoVec_GetArray(iovec);
+    size_t iovcnt = ccnxCodecNetworkBufferIoVec_GetCount(iovec);
+
+    size_t totalbytes = 0;
+    for (int i = 0; i < iovcnt; i++) {
+        totalbytes += array[i].iov_len;
+    }
+    PARCBuffer *buffer = parcBuffer_Allocate(totalbytes);
+    for (int i = 0; i < iovcnt; i++) {
+        parcBuffer_PutArray(buffer, array[i].iov_len, array[i].iov_base);
+    }
+    parcBuffer_Flip(buffer);
+
+    ccnxCodecNetworkBufferIoVec_Release(&iovec);
+
+    return buffer;
 }

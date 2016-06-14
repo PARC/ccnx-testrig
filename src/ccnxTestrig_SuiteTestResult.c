@@ -4,9 +4,9 @@
 
 struct ccnx_testrig_testresult {
     char *testCase;
-    char *reason;
-    bool passed;
     PARCLinkedList *packetList;
+    bool passed;
+    char *reason;
 };
 
 static bool
@@ -34,8 +34,10 @@ ccnxTestrigSuiteTestResult_Create(char *testCase)
     CCNxTestrigSuiteTestResult *result = parcObject_CreateInstance(CCNxTestrigSuiteTestResult);
 
     if (result != NULL) {
+        result->passed = true;
         result->testCase = malloc(strlen(testCase));
         strcpy(result->testCase, testCase);
+        result->packetList = parcLinkedList_Create();
     }
 
     return result;

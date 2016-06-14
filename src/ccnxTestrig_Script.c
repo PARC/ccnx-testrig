@@ -77,14 +77,13 @@ _ccnxTestrigScriptStep_CreateSendStep(int index, CCNxTestrigLinkID linkId, CCNxT
 }
 
 static CCNxTestrigScriptStep *
-_ccnxTestrigScriptStep_CreateReceiveStep(int index, CCNxTestrigLinkID linkId, CCNxTlvDictionary *messageDictionary,
-    CCNxTestrigScriptStep *reference, bool nullCheck, char *failureMessage)
+_ccnxTestrigScriptStep_CreateReceiveStep(int index, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *reference, bool nullCheck, char *failureMessage)
 {
     CCNxTestrigScriptStep *step = parcObject_CreateInstance(CCNxTestrigScriptStep);
     if (step != NULL) {
         step->stepIndex = index;
         step->linkId = linkId;
-        step->packet = ccnxTlvDictionary_Acquire(messageDictionary);
+        step->packet = NULL;
         step->send = false;
         step->reference = ccnxTestrigScriptStep_Acquire(reference);
 
@@ -121,7 +120,7 @@ CCNxTestrigScriptStep *
 ccnxTestrigScript_AddReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage)
 {
     size_t index = parcLinkedList_Size(script->steps);
-    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, NULL, step, false, failureMessage);
+    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, step, false, failureMessage);
     parcLinkedList_Append(script->steps, newStep);
     return newStep;
 }
@@ -130,39 +129,15 @@ CCNxTestrigScriptStep *
 ccnxTestrigScript_AddNullReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage)
 {
     size_t index = parcLinkedList_Size(script->steps);
-    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, NULL, step, true, failureMessage);
+    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, step, true, failureMessage);
     parcLinkedList_Append(script->steps, newStep);
     return newStep;
-}
-
-static PARCBuffer *
-_encodeDictionary(const CCNxTlvDictionary *dict)
-{
-    PARCSigner *signer = ccnxValidationCRC32C_CreateSigner();
-    CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode((CCNxTlvDictionary *) dict, signer);
-    const struct iovec *array = ccnxCodecNetworkBufferIoVec_GetArray(iovec);
-    size_t iovcnt = ccnxCodecNetworkBufferIoVec_GetCount((CCNxCodecNetworkBufferIoVec *) iovec);
-
-    size_t totalbytes = 0;
-    for (int i = 0; i < iovcnt; i++) {
-        totalbytes += array[i].iov_len;
-    }
-    PARCBuffer *buffer = parcBuffer_Allocate(totalbytes);
-    for (int i = 0; i < iovcnt; i++) {
-        parcBuffer_PutArray(buffer, array[i].iov_len, array[i].iov_base);
-    }
-    parcBuffer_Flip(buffer);
-
-    ccnxCodecNetworkBufferIoVec_Release(&iovec);
-    parcSigner_Release(&signer);
-
-    return buffer;
 }
 
 static CCNxTestrigSuiteTestResult *
 _ccnxTestrigScript_ExecuteSendStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
 {
-    PARCBuffer *packetBuffer = _encodeDictionary(step->packet);
+    PARCBuffer *packetBuffer = ccnxTestrigPacketUtility_EncodePacket(step->packet);
     ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, step->linkId), packetBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(result, packetBuffer);
     return result;
@@ -210,15 +185,17 @@ _ccnxTestrigScript_ExecuteStep(CCNxTestrigScript *script, CCNxTestrigScriptStep 
 CCNxTestrigSuiteTestResult *
 ccnxTestrigScript_Execute(CCNxTestrigScript *script, CCNxTestrig *rig)
 {
-    size_t numSteps = parcLinkedList_Size(script->steps);
+    int numSteps = parcLinkedList_Size(script->steps);
     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create(script->testCase);
 
-    for (size_t i = 0; i < numSteps; i++) {
+    for (int i = 0; i < numSteps; i++) {
+        printf(">> Executing step %d\n", i);
         CCNxTestrigScriptStep *step = parcLinkedList_GetAtIndex(script->steps, i);
         result = _ccnxTestrigScript_ExecuteStep(script, step, result, rig);
 
         // If the last step failed, stop the test and return the failure.
         if (ccnxTestrigSuiteTestResult_IsFailure(result)) {
+            printf(">> **** Failed at step %d\n", i);
             return result;
         }
     }

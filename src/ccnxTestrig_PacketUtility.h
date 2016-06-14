@@ -28,5 +28,6 @@ typedef enum {
 } CCNxManifestFieldError;
 
 CCNxTestrigSuiteTestResult *ccnxTestrigPacketUtility_IsValidPacketPair(CCNxTlvDictionary *sent, CCNxMetaMessage *received, CCNxTestrigSuiteTestResult *result);
+PARCBuffer *ccnxTestrigPacketUtility_EncodePacket(CCNxTlvDictionary *packetDictionary);
 
 #endif // ccnxTestrig_PacketUtility_h
