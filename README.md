@@ -1,9 +1,9 @@
 # CCNxTestrig
 
-CCNxTestrig is an application to perform functional tests for CCNx forwarders. 
-It treats the forwarder as a black box and assesses its packet forwarding 
+CCNxTestrig is an application to perform functional tests for CCNx forwarders.
+It treats the forwarder as a black box and assesses its packet forwarding
 functionality for correctness. Tests are prescriptive in nature and are
-built using compile-time test scripts. 
+built using compile-time test scripts.
 
 For example, the following test script creates a random Interest with the
 name prefix "ccnx:/test/b", a matching Content Object, and then ensures that
@@ -34,12 +34,12 @@ and then executes (part of or the entirety of) the test suite.
 
 2. Link: An abstraction of a forwarder link connection. Currently, UDP and TCP links are supported.
 
-3. Test suite: A collection of compiled test scripts that are executed. 
+3. Test suite: A collection of compiled test scripts that are executed.
 
 4. Test script: A set of steps to interact with the forwarder to send and receive packets
-on specific links. 
+on specific links.
 
-5. Reporter: A module that produces the test results. 
+5. Reporter: A module that produces the test results.
 
 These modules are composed as follows:
 
@@ -63,7 +63,7 @@ receive packets to interact with a forwarder. Scripts are created by providing p
 send verifying that they are received correctly. For example, a script step might be to
 send an Interest to link A attached to the forwarder. To verify receipt, the subsequent
 step might be a receive step that expects the packet which was sent to be that which was
-received. 
+received.
 
 Currently, test scripts must be written in C code. A future extension would be to implement
 a custom DSL to write these tests and have them compile to their C code equivalents. 
