@@ -1,3 +1,57 @@
+/*
+ * Copyright (c) 2016, Xerox Corporation (Xerox) and Palo Alto Research Center, Inc (PARC)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * * Redistributions of source code must retain the above copyright
+ *   notice, this list of conditions and the following disclaimer.
+ * * Redistributions in binary form must reproduce the above copyright
+ *   notice, this list of conditions and the following disclaimer in the
+ *   documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL XEROX OR PARC BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ################################################################################
+ * #
+ * # PATENT NOTICE
+ * #
+ * # This software is distributed under the BSD 2-clause License (see LICENSE
+ * # file).  This BSD License does not make any patent claims and as such, does
+ * # not act as a patent grant.  The purpose of this section is for each contributor
+ * # to define their intentions with respect to intellectual property.
+ * #
+ * # Each contributor to this source code is encouraged to state their patent
+ * # claims and licensing mechanisms for any contributions made. At the end of
+ * # this section contributors may each make their own statements.  Contributor's
+ * # claims and grants only apply to the pieces (source code, programs, text,
+ * # media, etc) that they have contributed directly to this software.
+ * #
+ * # There is no guarantee that this section is complete, up to date or accurate. It
+ * # is up to the contributors to maintain their portion of this section and up to
+ * # the user of the software to verify any claims herein.
+ * #
+ * # Do not remove this header notification.  The contents of this section must be
+ * # present in all distributions of the software.  You may only modify your own
+ * # intellectual property statements.  Please provide contact information.
+ *
+ * - Palo Alto Research Center, Inc
+ * This software distribution does not grant any rights to patents owned by Palo
+ * Alto Research Center, Inc (PARC). Rights to these patents are available via
+ * various mechanisms. As of January 2016 PARC has committed to FRAND licensing any
+ * intellectual property used by its contributions to this software. You may
+ * contact PARC at cipo@parc.com for more information or visit http://www.ccnx.org
+ */
 #include <LongBow/runtime.h>
 
 #include <parc/algol/parc_Object.h>
@@ -131,82 +185,6 @@ _createRandomName(char *prefix)
 }
 
 static CCNxTestrigSuiteTestResult *
-ccnxTestrigSuite_FIBTest_SimpleExchange(CCNxTestrig *rig, char *testCaseName)
-{
-    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
-
-    // Create the test packets
-    CCNxName *testName = _createRandomName("ccnx:/foo/bar");
-    assertNotNull(testName, "The name must not be NULL");
-    PARCBuffer *testPayload = parcBuffer_WrapCString("_ccnxTestrig_TestBasicExchange");
-
-    // Create the protocol messages
-    CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
-    CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
-
-    // Stamp wire format representations
-    PARCBuffer *interestBuffer = _encodeDictionary(interest);
-    PARCBuffer *contentBuffer = _encodeDictionary(content);
-
-    // Send the interest to the forwarder.
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
-    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
-    if (receivedInterestBuffer == NULL) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
-        return failure;
-    }
-
-    // Verify that the interest is correct
-    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
-    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
-        return failure;
-    }
-
-    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
-    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
-    if (interestError != CCNxInterestFieldError_None) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
-        return failure;
-    }
-
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
-    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_Receive(ccnxTestrig_GetLinkA(rig));
-
-    CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
-    if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
-        return failure;
-    }
-
-    CCNxContentObject *receivedContent = ccnxMetaMessage_GetContentObject(reconstructedContent);
-    if (_validContentPair(content, receivedContent) != CCNxContentObjectFieldError_None) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
-        return failure;
-    }
-
-    ccnxInterest_Release(&interest);
-    ccnxContentObject_Release(&content);
-
-    parcBuffer_Release(&interestBuffer);
-    parcBuffer_Release(&contentBuffer);
-    parcBuffer_Release(&receivedInterestBuffer);
-    parcBuffer_Release(&receivedContentBuffer);
-
-    ccnxMetaMessage_Release(&reconstructedContent);
-    ccnxInterest_Release(&receivedInterest);
-    ccnxContentObject_Release(&receivedContent);
-
-    parcBuffer_Release(&testPayload);
-    ccnxName_Release(&testName);
-
-    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
-    return testResult;
-}
-
-static CCNxTestrigSuiteTestResult *
 ccnxTestrigSuite_FIBTest_BasicInterest_1a(CCNxTestrig *rig, char *testCaseName)
 {
     // Create the protocol messages
@@ -259,7 +237,6 @@ ccnxTestrigSuite_FIBTest_BasicInterest_1b(CCNxTestrig *rig, char *testCaseName)
     ccnxName_Release(&testName);
     parcBuffer_Release(&testPayload);
 
-    // CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
     return testCaseResult;
 }
 
@@ -267,73 +244,27 @@ ccnxTestrigSuite_FIBTest_BasicInterest_1b(CCNxTestrig *rig, char *testCaseName)
 static CCNxTestrigSuiteTestResult *
 ccnxTestrigSuite_ContentObjectTest_1(CCNxTestrig *rig, char *testCaseName)
 {
-    CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
-
     // Create the test packets
     CCNxName *testName = _createRandomName("ccnx:/test/b");
     CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
     PARCBuffer *testPayload = parcBuffer_Allocate(1024);
     CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
 
-    // Stamp wire format representations
-    PARCBuffer *interestBuffer = _encodeDictionary(interest);
-    PARCBuffer *contentBuffer = _encodeDictionary(content);
+    CCNxTestrigScript *script = ccnxTestrigScript_Create(testCaseName);
+    CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, interest);
+    CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveStep(script, CCNxTestrigLinkID_LinkB, step1, "Failed to receive an interest packet from the forwarder.");
+    CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkB, content);
+    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveStep(script, CCNxTestrigLinkID_LinkA, step3, "Failed to receive a content packet from the forwarder.");
 
-    // Send the interest to the forwarder.
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
-    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
-    if (receivedInterestBuffer == NULL) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
-        return failure;
-    }
-
-    // Verify that the interest is correct
-    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
-    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
-        return failure;
-    }
-    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
-    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
-    if (interestError != CCNxInterestFieldError_None) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
-        return failure;
-    }
-
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
-    ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_Receive(ccnxTestrig_GetLinkA(rig));
-
-    CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
-    if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
-        return failure;
-    }
-
-    CCNxContentObject *receivedContent = ccnxMetaMessage_GetContentObject(reconstructedContent);
-    if (_validContentPair(content, receivedContent) != CCNxContentObjectFieldError_None) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
-        return failure;
-    }
+    CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
 
     ccnxInterest_Release(&interest);
     ccnxContentObject_Release(&content);
 
-    parcBuffer_Release(&interestBuffer);
-    parcBuffer_Release(&contentBuffer);
-    parcBuffer_Release(&receivedInterestBuffer);
-    parcBuffer_Release(&receivedContentBuffer);
-
-    ccnxMetaMessage_Release(&reconstructedContent);
-    ccnxInterest_Release(&receivedInterest);
-    ccnxContentObject_Release(&receivedContent);
-
     ccnxName_Release(&testName);
     parcBuffer_Release(&testPayload);
 
-    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
-    return testResult;
+    return testCaseResult;
 }
 
 // Request object, manifest
@@ -348,65 +279,21 @@ ccnxTestrigSuite_ContentObjectTest_2(CCNxTestrig *rig, char *testCaseName)
     PARCBuffer *testPayload = parcBuffer_Allocate(1024);
     CCNxManifest *manifest = ccnxManifest_Create(testName);
 
-    // Stamp wire format representations
-    PARCBuffer *interestBuffer = _encodeDictionary(interest);
-    PARCBuffer *manifestBuffer = _encodeDictionary(manifest);
+    CCNxTestrigScript *script = ccnxTestrigScript_Create(testCaseName);
+    CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, interest);
+    CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveStep(script, CCNxTestrigLinkID_LinkB, step1, "Failed to receive an interest packet from the forwarder.");
+    CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkB, manifest);
+    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveStep(script, CCNxTestrigLinkID_LinkA, step3, "Failed to receive a content packet from the forwarder.");
 
-    // Send the interest to the forwarder.
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
-    ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
-    if (receivedInterestBuffer == NULL) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
-        return failure;
-    }
-
-    // Verify that the interest is correct
-    CCNxMetaMessage *reconstructedInterest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedInterestBuffer);
-    if (ccnxMetaMessage_IsInterest(reconstructedInterest)) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be an interest.");
-        return failure;
-    }
-    CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(reconstructedInterest);
-    CCNxInterestFieldError interestError = _validInterestPair(interest, receivedInterest);
-    if (interestError != CCNxInterestFieldError_None) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "An interest field was incorrect");
-        return failure;
-    }
-
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), manifestBuffer);
-    ccnxTestrigSuiteTestResult_LogPacket(testCase, manifestBuffer);
-    PARCBuffer *receivedManifestBuffer = ccnxTestrigLink_Receive(ccnxTestrig_GetLinkA(rig));
-
-    CCNxMetaMessage *reconstructedManifest = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedManifestBuffer);
-    if (ccnxMetaMessage_IsManifest(reconstructedManifest)) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a manifest.");
-        return failure;
-    }
-
-    CCNxManifest *receivedManifest = ccnxMetaMessage_GetManifest(reconstructedManifest);
-    if (_validManifestPair(manifest, receivedManifest) != CCNxManifestFieldError_None) {
-        CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a manifest.");
-        return failure;
-    }
+    CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
 
     ccnxInterest_Release(&interest);
     ccnxManifest_Release(&manifest);
 
-    parcBuffer_Release(&interestBuffer);
-    parcBuffer_Release(&manifestBuffer);
-    parcBuffer_Release(&receivedInterestBuffer);
-    parcBuffer_Release(&receivedManifestBuffer);
-
-    ccnxMetaMessage_Release(&reconstructedManifest);
-    ccnxInterest_Release(&receivedInterest);
-    ccnxContentObject_Release(&receivedManifest);
-
     ccnxName_Release(&testName);
     parcBuffer_Release(&testPayload);
 
-    CCNxTestrigSuiteTestResult *testResult = ccnxTestrigSuiteTestResult_SetPass(testCase);
-    return testResult;
+    return testCaseResult;
 }
 
 // Request object, dual path
@@ -1054,7 +941,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_2(CCNxTestrig *rig, char *testCas
     CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
 
     PARCBuffer *signatureBits = parcBuffer_Allocate(10); // arbitrary bufer size -- not important
-    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARC_HASH_SHA256, signatureBits);
+    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARCCryptoHashType_SHA256, signatureBits);
     PARCBuffer *keyId = parcBuffer_Allocate(32);
 
     CCNxName *locatorName = ccnxName_CreateFromCString("ccnx:/key/locator");
@@ -1140,7 +1027,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_3(CCNxTestrig *rig, char *testCas
     CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
 
     PARCBuffer *signatureBits = parcBuffer_Allocate(10); // arbitrary bufer size -- not important
-    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARC_HASH_SHA256, signatureBits);
+    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARCCryptoHashType_SHA256, signatureBits);
     PARCBuffer *keyId = parcBuffer_Allocate(32);
 
     CCNxName *locatorName = ccnxName_CreateFromCString("ccnx:/key/locator");
@@ -1375,7 +1262,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_2(CCNxTestrig *rig, char *te
     CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
 
     PARCBuffer *signatureBits = parcBuffer_Allocate(10); // arbitrary bufer size -- not important
-    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARC_HASH_SHA256, signatureBits);
+    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARCCryptoHashType_SHA256, signatureBits);
     PARCBuffer *keyId = parcBuffer_Allocate(32);
 
     CCNxName *locatorName = ccnxName_CreateFromCString("ccnx:/key/locator");
@@ -1527,7 +1414,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_4(CCNxTestrig *rig, char *te
     CCNxContentObject *content = ccnxContentObject_CreateWithPayload(testPayload);
 
     PARCBuffer *signatureBits = parcBuffer_Allocate(10); // arbitrary bufer size -- not important
-    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARC_HASH_SHA256, signatureBits);
+    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARCCryptoHashType_SHA256, signatureBits);
     PARCBuffer *keyId = parcBuffer_Allocate(32);
 
     CCNxName *locatorName = ccnxName_CreateFromCString("ccnx:/key/locator");
@@ -1606,7 +1493,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_5(CCNxTestrig *rig, char *te
     CCNxContentObject *content = ccnxContentObject_CreateWithPayload(testPayload);
 
     PARCBuffer *signatureBits = parcBuffer_Allocate(10); // arbitrary bufer size -- not important
-    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARC_HASH_SHA256, signatureBits);
+    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARCCryptoHashType_SHA256, signatureBits);
     PARCBuffer *keyId = parcBuffer_Allocate(32);
 
     CCNxName *locatorName = ccnxName_CreateFromCString("ccnx:/key/locator");
@@ -1687,7 +1574,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_6(CCNxTestrig *rig, char *te
     CCNxContentObject *content = ccnxContentObject_CreateWithPayload(testPayload);
 
     PARCBuffer *signatureBits = parcBuffer_Allocate(10); // arbitrary bufer size -- not important
-    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARC_HASH_SHA256, signatureBits);
+    PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARCCryptoHashType_SHA256, signatureBits);
     PARCBuffer *keyId = parcBuffer_Allocate(32);
 
     CCNxName *locatorName = ccnxName_CreateFromCString("ccnx:/key/locator");
@@ -1858,9 +1745,10 @@ ccnxTestrigSuite_RunTest(CCNxTestrig *rig, CCNxTestrigSuiteTest test)
     return result;
 }
 
-void
+PARCLinkedList *
 ccnxTestrigSuite_RunAll(CCNxTestrig *rig)
 {
+    PARCLinkedList *resultList = parcLinkedList_Create();
     CCNxTestrigReporter *reporter = ccnxTestrig_GetReporter(rig);
 
     for (int i = 0; i < CCNxTestrigSuiteTest_LastEntry; i++) {
@@ -1869,5 +1757,10 @@ ccnxTestrigSuite_RunAll(CCNxTestrig *rig)
         if (result != NULL) {
             ccnxTestrigSuiteTestResult_Report(result, reporter);
         }
+
+        parcLinkedList_Append(resultList, result);
+        ccnxTestrigSuiteTestResult_Release(&result);
     }
+
+    return resultList;
 }
