@@ -57,16 +57,115 @@
 
 #include "ccnxTestrig_Reporter.h"
 
+#include <parc/algol/parc_Buffer.h>
+
 struct ccnx_testrig_testresult;
 typedef struct ccnx_testrig_testresult CCNxTestrigSuiteTestResult;
 
+/**
+ * Create a `CCNxTestrigSuiteTestResult` result container.
+ *
+ * This stores the context for a test case result and any additional information,
+ * such as an error message. Initially, the test result is neither a success
+ * or failure.
+ *
+ * @param [in] testCase An identifier for the test case.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create("special test");
+ * }
+ * @endcode
+ */
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_Create(char *testCase);
+
+/**
+ * Mark the `CCNxTestrigSuiteTestResult` as a successful test case.
+ *
+ * @param [in] testCase The `CCNxTestrigSuiteTestResult` to be marked as a success.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create("easy test");
+ *     ...
+ *     ccnxTestrigSuiteTestResult_SetPass(result);
+ * }
+ * @endcode
+ */
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_SetPass(CCNxTestrigSuiteTestResult *testCase);
+
+/**
+ * Mark the `CCNxTestrigSuiteTestResult` as a failed test case.
+ *
+ * @param [in] testCase The `CCNxTestrigSuiteTestResult` to be marked as a failure.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create("hard test");
+ *     ...
+ *     ccnxTestrigSuiteTestResult_SetFail(result);
+ * }
+ * @endcode
+ */
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_SetFail(CCNxTestrigSuiteTestResult *testCase, char *reason);
 
+/**
+ * Determine if the test case is a failure.
+ *
+ * @param [in] testCase The `CCNxTestrigSuiteTestResult` to be inspected.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create("hard test");
+ *     ...
+ *     ccnxTestrigSuiteTestResult_SetFail(result);
+ *     ...
+ *     if (ccnxTestrigSuiteTestResult_IsFailure(result)) {
+ *          // handle the failure
+ *     }
+ * }
+ * @endcode
+ */
 bool ccnxTestrigSuiteTestResult_IsFailure(CCNxTestrigSuiteTestResult *testCase);
 
+/**
+ * Log a packet to this test case. This will accumulate the packet so that it can
+ * later be retrieved for debugging purposes.
+ *
+ * @param [in] testCase The `CCNxTestrigSuiteTestResult` to be amended.
+ * @param [in] packet A wire-encoded packet in a `PARCBuffer`.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create("hard test");
+ *     ...
+ *     PARCBuffer *packet = ...
+ *     ccnxTestrigSuiteTestResult_LogPacket(result, packet);
+ * }
+ * @endcode
+ */
 void ccnxTestrigSuiteTestResult_LogPacket(CCNxTestrigSuiteTestResult *testCase, PARCBuffer *packet);
-void ccnxTestrigSuiteTestResult_Report(CCNxTestrigSuiteTestResult *result, CCNxTestrigReporter *reporter);
 
+/**
+ * Report a `CCNxTestrigSuiteTestResult` instance.
+ *
+ * @param [in] testCase The `CCNxTestrigSuiteTestResult` to be reported.
+ * @param [in] reporter A `CCNxTestrigReporter` instance.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create("hard test");
+ *     ...
+ *     PARCBuffer *packet = ...
+ *     ccnxTestrigSuiteTestResult_LogPacket(result, packet);
+ * }
+ * @endcode
+ */
+void ccnxTestrigSuiteTestResult_Report(CCNxTestrigSuiteTestResult *result, CCNxTestrigReporter *reporter);
 #endif

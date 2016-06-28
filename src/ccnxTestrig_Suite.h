@@ -85,7 +85,38 @@ typedef enum {
     CCNxTestrigSuiteTest_LastEntry
 } CCNxTestrigSuiteTest;
 
+/**
+ * Run all of the test cases and return the results in a list.
+ *
+ * Each element of the resultant list will be of type `CCNxTestrigSuiteTestResult`.
+ *
+ * @param [in] rig The `CCNxTestrig` to use for the tests.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrig *rig = ...
+ *
+ *     PARCLinkedList *list = ccnxTestrigSuite_RunAll(rig);
+ * }
+ * @endcode
+ */
 PARCLinkedList *ccnxTestrigSuite_RunAll(CCNxTestrig *rig);
-CCNxTestrigSuiteTestResult *ccnxTestrigSuite_RunTest(CCNxTestrig *rig, CCNxTestrigSuiteTest test);
 
+/**
+ * Run a single test case and return the result.
+ *
+ * @param [in] rig The `CCNxTestrig` to use for the test.
+ * @param [in] test The `CCNxTestrigSuiteTest` (enum value) test to run.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrig *rig = ...
+ *
+ *     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuite_RunTest(rig, CCNxTestrigSuiteTest_ContentObjectTest_1);
+ * }
+ * @endcode
+ */
+CCNxTestrigSuiteTestResult *ccnxTestrigSuite_RunTest(CCNxTestrig *rig, CCNxTestrigSuiteTest test);
 #endif // ccnx_testrig_suite_h

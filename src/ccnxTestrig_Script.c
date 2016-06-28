@@ -76,7 +76,8 @@ _ccnxTestrigScript_Destructor(CCNxTestrigScript **resultPtr)
 {
     CCNxTestrigScript *result = *resultPtr;
 
-    parcMemory_Deallocate(&(result->testCase));
+    parcMemory_Deallocate(&result->testCase);
+    parcLinkedList_Release(&result->steps);
 
     return true;
 }

@@ -154,37 +154,37 @@ ccnxTestrig_GetReporter(CCNxTestrig *rig)
     return rig->reporter;
 }
 
+static CCNxTestrigLink *
+_ccnxTestrig_GetLinkA(CCNxTestrig *rig)
+{
+    return rig->linkA;
+}
+
+static CCNxTestrigLink *
+_ccnxTestrig_GetLinkB(CCNxTestrig *rig)
+{
+    return rig->linkB;
+}
+
+static CCNxTestrigLink *
+_ccnxTestrig_GetLinkC(CCNxTestrig *rig)
+{
+    return rig->linkC;
+}
+
 CCNxTestrigLink *
 ccnxTestrig_GetLinkByID(CCNxTestrig *rig, CCNxTestrigLinkID linkID)
 {
     switch (linkID) {
         case CCNxTestrigLinkID_LinkA:
-            return ccnxTestrig_GetLinkA(rig);
+            return _ccnxTestrig_GetLinkA(rig);
         case CCNxTestrigLinkID_LinkB:
-            return ccnxTestrig_GetLinkB(rig);
+            return _ccnxTestrig_GetLinkB(rig);
         case CCNxTestrigLinkID_LinkC:
-            return ccnxTestrig_GetLinkC(rig);
+            return _ccnxTestrig_GetLinkC(rig);
     }
 
     return NULL;
-}
-
-CCNxTestrigLink *
-ccnxTestrig_GetLinkA(CCNxTestrig *rig)
-{
-    return rig->linkA;
-}
-
-CCNxTestrigLink *
-ccnxTestrig_GetLinkB(CCNxTestrig *rig)
-{
-    return rig->linkB;
-}
-
-CCNxTestrigLink *
-ccnxTestrig_GetLinkC(CCNxTestrig *rig)
-{
-    return rig->linkC;
 }
 
 void

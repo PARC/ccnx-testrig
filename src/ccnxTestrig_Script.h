@@ -67,12 +67,111 @@ typedef struct ccnx_testrig_script CCNxTestrigScript;
 struct ccnx_testrig_script_step;
 typedef struct ccnx_testrig_script_step CCNxTestrigScriptStep;
 
+/**
+ * Create an empty test script for the given test case.
+ *
+ * @param [in] testCase The name of the test case.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
+ * }
+ * @endcode
+ */
 CCNxTestrigScript *ccnxTestrigScript_Create(char *testCase);
 
-CCNxTestrigScriptStep *ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTlvDictionary *messageDictionary);
+/**
+ * Add a "send step" to the test case. When executed, this will send the specified
+ * packet to the specified link.
+ *
+ * @param [in] script A `CCNxTestrigScript` instance.
+ * @param [in] linkId The link to which the packet should be sent.
+ * @param [in] packet The `CCNxTlvDictionary` to send.
+ *
+ * @return The `CCNxTestrigScriptStep` instance that refers to this step.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
+ *
+ *     CCNxTlvDictionary *packet = ...
+ *     CCNxTestrigScriptStep *sendStep = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, packet);
+ * }
+ * @endcode
+ */
+CCNxTestrigScriptStep *ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTlvDictionary *packet);
+
+/**
+ * Add a "receive step" to the test case. When executed, this step will receive a packet
+ * from the specified link and verify that it matches that which was sent in the
+ * corresponding send step. If not, the failure message is used for the execution result.
+ *
+ * @param [in] script A `CCNxTestrigScript` instance.
+ * @param [in] linkId The link to which the packet should be sent.
+ * @param [in] step The referncing `CCNxTestrigScriptStep` step.
+ * @param [in] failureMessage The failure message to use when the received packet does not match that which was sent.
+ *
+ * @return The `CCNxTestrigScriptStep` instance that refers to this step.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
+ *
+ *     CCNxTlvDictionary *packet = ...
+ *     CCNxTestrigScriptStep *sendStep = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, packet);
+ *
+ *     CCNxTestrigScriptStep *receiveStep = ccnxTestrigScript_AddReceiveStep(script, CCNxTestrigLinkID_LinkB, sendStep, "failed to get the message");
+ * }
+ * @endcode
+ */
 CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage);
+
+/**
+ * Add a "null receive step" to the test case. When executed, this step will
+ * attempt to receive a packet from the specified link and verify that it failed.
+ *
+ * @param [in] script A `CCNxTestrigScript` instance.
+ * @param [in] linkId The link to which the packet should be sent.
+ * @param [in] step The referncing `CCNxTestrigScriptStep` step.
+ * @param [in] failureMessage The failure message to use when the received packet does not match that which was sent.
+ *
+ * @return The `CCNxTestrigScriptStep` instance that refers to this step.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
+ *
+ *     CCNxTlvDictionary *packet = ...
+ *     CCNxTestrigScriptStep *sendStep = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, packet);
+ *
+ *     CCNxTestrigScriptStep *failedReceiveStep = ccnxTestrigScript_AddNullReceiveStep(script, CCNxTestrigLinkID_LinkB, sendStep, "failed to get the message");
+ * }
+ * @endcode
+ */
 CCNxTestrigScriptStep *ccnxTestrigScript_AddNullReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage);
 
+/**
+ * Execute the test script and return the result.
+ *
+ * @param [in] script A `CCNxTestrigScript` instance.
+ * @param [in] rig A `CCNxTestrig` instance.
+ *
+ * @return The `CCNxTestrigSuiteTestResult` result.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
+ *     ... // add steps
+ *
+ *     CCNxTestrig *rig = ...
+ *     CCNxTestrigSuiteTestResult *result = ccnxTestrigScript_Execute(script, rig);
+ * }
+ * @endcode
+ */
 CCNxTestrigSuiteTestResult *ccnxTestrigScript_Execute(CCNxTestrigScript *script, CCNxTestrig *rig);
-
 #endif

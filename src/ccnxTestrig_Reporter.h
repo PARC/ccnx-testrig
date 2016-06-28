@@ -60,13 +60,39 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <parc/algol/parc_HashMap.h>
-
 struct ccnx_testrig_reporter;
 typedef struct ccnx_testrig_reporter CCNxTestrigReporter;
 
+/**
+ * Create a `CCNxTestrigReporter` that logs to the given FILE.
+ *
+ * @param [in] fout The FILE to which the report is logged.
+ *
+ * @return A newly allocated `CCNxTestrigReporter`.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigReporter *reporter = ccnxTestrigReporter_Create(stdout);
+ * }
+ * @endcode
+ */
 CCNxTestrigReporter *ccnxTestrigReporter_Create(FILE *fout);
 
+/**
+ * Report a message.
+ *
+ * @param [in] reporter A `CCNxTestrigReporter` instance.
+ * @param [in] message The message to report.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigReporter *reporter = ccnxTestrigReporter_Create(stdout);
+ *
+ *     ccnxTestrigReporter_Report(reporter, "This is an important message.")
+ * }
+ * @endcode
+ */
 void ccnxTestrigReporter_Report(CCNxTestrigReporter *reporter, char *message);
-
 #endif // ccnxTestrigReporter

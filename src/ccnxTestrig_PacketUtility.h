@@ -81,7 +81,49 @@ typedef enum {
     CCNxManifestFieldError_None
 } CCNxManifestFieldError;
 
-CCNxTestrigSuiteTestResult *ccnxTestrigPacketUtility_IsValidPacketPair(CCNxTlvDictionary *sent, CCNxMetaMessage *received, CCNxTestrigSuiteTestResult *result);
-PARCBuffer *ccnxTestrigPacketUtility_EncodePacket(CCNxTlvDictionary *packetDictionary);
+/**
+ * Determine if the "packet pair" is valid. The sent packet will be that
+ * which was sent to the forwarder and the received packet is that which was
+ * received from the forwarder.
+ *
+ * The forwarder is expected to make some modifications to the packet, e.g., by
+ * decrementing the hop count. This function checks those conditions.
+ *
+ * @param [in] sent The `CCNxTlvDictionary` sent packet
+ * @param [in] received The `CCNxTlvDictionary` received packet
+ * @param [in] result The `CCNxTestrigSuiteTestResult` in which to record any errors.
+ *
+ * @return The possibly modified `CCNxTestrigSuiteTestResult` instance.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTlvDictionary *sent = ...
+ *     CCNxTlvDictionary *received = ...
+ *     CCNxTestrigSuiteTestResult *result = ...
+ *
+ *     result = ccnxTestrigPacketUtility_IsValidPacketPair(sent, received, result);
+ * }
+ * @endcode
+ */
+CCNxTestrigSuiteTestResult *ccnxTestrigPacketUtility_IsValidPacketPair(CCNxTlvDictionary *sent,
+    CCNxMetaMessage *received, CCNxTestrigSuiteTestResult *result);
 
+/**
+ * Encode a packet to its wire format.
+ *
+ * @param [in] packetDictionary The `CCNxTlvDictionary` to encode.
+ *
+ * @return A `PARCBuffer` containing the wire-encoded packet.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTlvDictionary *message = ...
+ *
+ *     PARCBuffer *wireEncodedFormat = ccnxTestrigPacketUtility_EncodePacket(message);
+ * }
+ * @endcode
+ */
+PARCBuffer *ccnxTestrigPacketUtility_EncodePacket(CCNxTlvDictionary *packetDictionary);
 #endif // ccnxTestrig_PacketUtility_h

@@ -67,11 +67,34 @@ typedef enum {
     CCNxTestrigLinkID_LinkC
 } CCNxTestrigLinkID;
 
+/**
+ * Retrieve the `CCNxTestrigReporter` associated with the given `CCNxTestrig`.
+ *
+ * @param [in] rig A `CCNxTestrig` instance.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrig *rig = ...
+ *     CCNxTestrigReporter *reporter = ccnxTestrig_GetReporter(rig);
+ * }
+ * @endcode
+ */
 CCNxTestrigReporter *ccnxTestrig_GetReporter(CCNxTestrig *rig);
 
+/**
+ * Retrieve the forwarder link associated with the given identity.
+ *
+ * @param [in] rig A `CCNxTestrig` instance.
+ * @param [in] linkID A CCNxTestrigLinkID corresponding to one of the forwarder-under-test links.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrig *rig = ...
+ *     CCNxTestrigLink *linkA = ccnxTestrig_GetLinkByID(CCNxTestrigLinkID_LinkA);
+ * }
+ * @endcode
+ */
 CCNxTestrigLink *ccnxTestrig_GetLinkByID(CCNxTestrig *rig, CCNxTestrigLinkID linkID);
-CCNxTestrigLink *ccnxTestrig_GetLinkA(CCNxTestrig *rig);
-CCNxTestrigLink *ccnxTestrig_GetLinkB(CCNxTestrig *rig);
-CCNxTestrigLink *ccnxTestrig_GetLinkC(CCNxTestrig *rig);
-
 #endif // ccnx_testrig_h

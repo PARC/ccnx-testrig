@@ -58,6 +58,7 @@
 #include <string.h>
 
 #include "ccnxTestrig_Reporter.h"
+#include <parc/algol/parc_Object.h>
 
 struct ccnx_testrig_reporter {
     FILE *fp;

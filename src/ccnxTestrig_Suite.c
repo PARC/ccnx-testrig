@@ -313,15 +313,15 @@ ccnxTestrigSuite_ContentObjectTest_3(CCNxTestrig *rig, char *testCaseName)
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder.
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on links B or C.
     bool linkC = true;
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         linkC = false;
-        receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+        receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
         if (receivedInterestBuffer == NULL) {
             CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
             return failure;
@@ -343,12 +343,12 @@ ccnxTestrigSuite_ContentObjectTest_3(CCNxTestrig *rig, char *testCaseName)
 
     // Send the content back to the right downstream link
     if (linkC) {
-        ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+        ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     } else {
-        ccnxTestrigLink_Send(ccnxTestrig_GetLinkB(rig), contentBuffer);
+        ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkB), contentBuffer);
     }
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_Receive(ccnxTestrig_GetLinkA(rig));
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_Receive(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA));
 
     CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
     if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
@@ -398,11 +398,11 @@ ccnxTestrigSuite_ContentObjectTest_4(CCNxTestrig *rig, char *testCaseName)
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder.
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on links B -- not link A
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -422,9 +422,9 @@ ccnxTestrigSuite_ContentObjectTest_4(CCNxTestrig *rig, char *testCaseName)
     }
 
     // Send the content back to the right downstream link
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkB(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkB), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_Receive(ccnxTestrig_GetLinkA(rig));
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_Receive(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA));
 
     CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
     if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
@@ -474,20 +474,20 @@ ccnxTestrigSuite_ContentObjectTest_5(CCNxTestrig *rig, char *testCaseName)
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Send the interest to the forwarder on link B, and cause aggregation
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkB(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkB), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
     }
-    receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer != NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Received two packets from the forwarder (interests were not aggregated correctly).");
         return failure;
@@ -507,12 +507,12 @@ ccnxTestrigSuite_ContentObjectTest_5(CCNxTestrig *rig, char *testCaseName)
     }
 
     // Send the content back to the right downstream link
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Receive the content on both links
-    PARCBuffer *receivedContentBufferA = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
-    PARCBuffer *receivedContentBufferB = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkB(rig), 1000);
+    PARCBuffer *receivedContentBufferA = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
+    PARCBuffer *receivedContentBufferB = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkB), 1000);
 
     assertTrue(parcBuffer_Equals(receivedContentBufferA, receivedContentBufferA), "Expected the received content objects to be equal.");
 
@@ -565,11 +565,11 @@ ccnxTestrigSuite_ContentObjectTest_6(CCNxTestrig *rig, char *testCaseName)
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -577,10 +577,10 @@ ccnxTestrigSuite_ContentObjectTest_6(CCNxTestrig *rig, char *testCaseName)
     parcBuffer_Release(&receivedInterestBuffer);
 
     // Send the interest to the forwarder on link A again and cause passthrough
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
-    receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Received two packets from the forwarder (interests were not aggregated correctly).");
         return failure;
@@ -600,11 +600,11 @@ ccnxTestrigSuite_ContentObjectTest_6(CCNxTestrig *rig, char *testCaseName)
     }
 
     // Send the content back to the right downstream link
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Receive the content on link A only
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
 
     CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
     if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
@@ -654,11 +654,11 @@ ccnxTestrigSuite_ContentObjectTestErrors_1(CCNxTestrig *rig, char *testCaseName)
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -679,11 +679,11 @@ ccnxTestrigSuite_ContentObjectTestErrors_1(CCNxTestrig *rig, char *testCaseName)
     }
 
     // Send the content back on the same interest where the content was sent
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     assertNull(receivedContentBuffer, "Expected nothing to be returned on link A since the interest was self-satisfied");
 
     ccnxInterest_Release(&interest);
@@ -719,11 +719,11 @@ ccnxTestrigSuite_ContentObjectTestErrors_2(CCNxTestrig *rig, char *testCaseName)
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -744,11 +744,11 @@ ccnxTestrigSuite_ContentObjectTestErrors_2(CCNxTestrig *rig, char *testCaseName)
     }
 
     // Send the content back from link C (the incorrect link)
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     assertNull(receivedContentBuffer, "Expected nothing to be returned on link A since the interest was self-satisfied");
 
     ccnxInterest_Release(&interest);
@@ -784,11 +784,11 @@ ccnxTestrigSuite_ContentObjectTestErrors_3(CCNxTestrig *rig, char *testCaseName)
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -809,11 +809,11 @@ ccnxTestrigSuite_ContentObjectTestErrors_3(CCNxTestrig *rig, char *testCaseName)
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
     if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
@@ -829,11 +829,11 @@ ccnxTestrigSuite_ContentObjectTestErrors_3(CCNxTestrig *rig, char *testCaseName)
     parcBuffer_Release(&receivedContentBuffer);
 
     // Send the content back from link C again
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Test that the content is not forwarded twice
-    receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     assertNull(receivedContentBuffer, "Expected nothing to be returned on link A since the interest was self-satisfied");
 
     ccnxInterest_Release(&interest);
@@ -871,11 +871,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_1(CCNxTestrig *rig, char *testCas
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -896,11 +896,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_1(CCNxTestrig *rig, char *testCas
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
     if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
@@ -957,11 +957,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_2(CCNxTestrig *rig, char *testCas
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -982,11 +982,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_2(CCNxTestrig *rig, char *testCas
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
     if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
@@ -1044,11 +1044,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_3(CCNxTestrig *rig, char *testCas
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -1069,11 +1069,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_3(CCNxTestrig *rig, char *testCas
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
     if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
@@ -1121,11 +1121,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_4(CCNxTestrig *rig, char *testCas
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -1146,11 +1146,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_4(CCNxTestrig *rig, char *testCas
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     CCNxMetaMessage *reconstructedContent = ccnxMetaMessage_CreateFromWireFormatBuffer(receivedContentBuffer);
     if (ccnxMetaMessage_IsContentObject(reconstructedContent)) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Expected the received message to be a content object.");
@@ -1199,11 +1199,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_1(CCNxTestrig *rig, char *te
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -1224,11 +1224,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_1(CCNxTestrig *rig, char *te
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     if (receivedContentBuffer != NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Should not receive a response since the hash digest did not match.");
         return failure;
@@ -1280,11 +1280,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_2(CCNxTestrig *rig, char *te
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -1305,11 +1305,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_2(CCNxTestrig *rig, char *te
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     if (receivedContentBuffer != NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Should not receive a response since the key ID restriction did not match.");
         return failure;
@@ -1351,11 +1351,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_3(CCNxTestrig *rig, char *te
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -1376,11 +1376,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_3(CCNxTestrig *rig, char *te
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     if (receivedContentBuffer != NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Should not receive a response since the key ID restriction did not match.");
         return failure;
@@ -1430,11 +1430,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_4(CCNxTestrig *rig, char *te
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -1455,11 +1455,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_4(CCNxTestrig *rig, char *te
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     if (receivedContentBuffer != NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Should not receive a response since the key ID restriction did not match.");
         return failure;
@@ -1511,11 +1511,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_5(CCNxTestrig *rig, char *te
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -1536,11 +1536,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_5(CCNxTestrig *rig, char *te
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     if (receivedContentBuffer != NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Should not receive a response since the key ID restriction did not match.");
         return failure;
@@ -1593,11 +1593,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_6(CCNxTestrig *rig, char *te
     PARCBuffer *contentBuffer = _encodeDictionary(content);
 
     // Send the interest to the forwarder on link A
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkA(rig), interestBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), interestBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, interestBuffer);
 
     // Receive the interest on C
-    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkC(rig), 1000);
+    PARCBuffer *receivedInterestBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), 1000);
     if (receivedInterestBuffer == NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Failed to receive a packet from the forwarder.");
         return failure;
@@ -1618,11 +1618,11 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_6(CCNxTestrig *rig, char *te
     }
 
     // Send the content back from link C
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkC(rig), contentBuffer);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkC), contentBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(testCase, contentBuffer);
 
     // Attempt to receive the content on link A
-    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkA(rig), 1000);
+    PARCBuffer *receivedContentBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA), 1000);
     if (receivedContentBuffer != NULL) {
         CCNxTestrigSuiteTestResult *failure = ccnxTestrigSuiteTestResult_SetFail(testCase, "Should not receive a response since the key ID restriction did not match.");
         return failure;
