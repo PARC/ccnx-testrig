@@ -81,6 +81,51 @@ typedef struct ccnx_testrig_testresult CCNxTestrigSuiteTestResult;
 CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_Create(char *testCase);
 
 /**
+ * Increase the number of references to a `CCNxTestrigSuiteTestResult`.
+ *
+ * Note that new `CCNxTestrigSuiteTestResult` is not created,
+ * only that the given `CCNxTestrigSuiteTestResult` reference count is incremented.
+ * Discard the reference by invoking `ccnxTestrigSuiteTestResult_Release`.
+ *
+ * @param [in] result A pointer to a `CCNxTestrigSuiteTestResult` instance.
+ *
+ * @return The input `CCNxTestrigSuiteTestResult` pointer.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigSuiteTestResult *result = ...
+ *     CCNxTestrigSuiteTestResult *handle = ccnxTestrigSuiteTestResult_Acquire(result);
+ * }
+ * @endcode
+ */
+CCNxTestrigSuiteTestResult *ccnxTestrigSuiteTestResult_Acquire(const CCNxTestrigSuiteTestResult *result);
+
+/**
+ * Release a previously acquired reference to the specified instance,
+ * decrementing the reference count for the instance.
+ *
+ * The pointer to the instance is set to NULL as a side-effect of this function.
+ *
+ * If the invocation causes the last reference to the instance to be released,
+ * the instance is deallocated and the instance's implementation will perform
+ * additional cleanup and release other privately held references.
+ *
+ * @param [in,out] resultPtr A pointer to a pointer to the instance to release.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigSuiteTestResult *result = ...
+ *     CCNxTestrigSuiteTestResult *handle = ccnxTestrigSuiteTestResult_Acquire(result);
+ *
+ *     ccnxTestrigSuiteTestResult_Release(&handle);
+ * }
+ * @endcode
+ */
+void ccnxTestrigSuiteTestResult_Release(CCNxTestrigSuiteTestResult **resultPtr);
+
+/**
  * Mark the `CCNxTestrigSuiteTestResult` as a successful test case.
  *
  * @param [in] testCase The `CCNxTestrigSuiteTestResult` to be marked as a success.

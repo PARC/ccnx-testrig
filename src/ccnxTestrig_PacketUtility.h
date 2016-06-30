@@ -126,4 +126,22 @@ CCNxTestrigSuiteTestResult *ccnxTestrigPacketUtility_IsValidPacketPair(CCNxTlvDi
  * @endcode
  */
 PARCBuffer *ccnxTestrigPacketUtility_EncodePacket(CCNxTlvDictionary *packetDictionary);
+
+/**
+ * Compute the hash of a packet.
+ *
+ * @param [in] packetDictionary The `CCNxTlvDictionary` to encode.
+ *
+ * @return A `PARCBuffer` containing the hash of a packet.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTlvDictionary *message = ...
+ *
+ *     PARCBuffer *hash = ccnxTestrigPacketUtility_ComputeMessageHash(message);
+ * }
+ * @endcode
+ */
+PARCBuffer *ccnxTestrigPacketUtility_ComputeMessageHash(CCNxTlvDictionary *dictionary);
 #endif // ccnxTestrig_PacketUtility_h

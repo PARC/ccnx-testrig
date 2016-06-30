@@ -142,3 +142,15 @@ ccnxTestrigPacketUtility_EncodePacket(CCNxTlvDictionary *dict)
 
     return buffer;
 }
+
+PARCBuffer *
+ccnxTestrigPacketUtility_ComputeMessageHash(CCNxTlvDictionary *dictionary)
+{
+    CCNxWireFormatMessageInterface *wireFacade = ccnxWireFormatMessageInterface_GetInterface(dictionary);
+    PARCCryptoHash *hash = wireFacade->computeContentObjectHash(dictionary);
+
+    PARCBuffer *digest = parcBuffer_Acquire(parcCryptoHash_GetDigest(hash));
+    parcCryptoHash_Release(&hash);
+
+    return digest;
+}

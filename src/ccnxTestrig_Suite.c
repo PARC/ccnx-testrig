@@ -73,101 +73,91 @@
 #include "ccnxTestrig_Suite.h"
 #include "ccnxTestrig_SuiteTestResult.h"
 #include "ccnxTestrig_Script.h"
+#include "ccnxTestrig_PacketUtility.h"
 
-typedef enum {
-    CCNxInterestFieldError_Name,
-    CCNxInterestFieldError_Lifetime,
-    CCNxInterestFieldError_HopLimit,
-    CCNxInterestFieldError_KeyIdRestriction,
-    CCNxInterestFieldError_ContentObjectHashRestriction,
-    CCNxInterestFieldError_None
-} CCNxInterestFieldError;
-
-typedef enum {
-    CCNxContentObjectFieldError_Name,
-    CCNxContentObjectFieldError_Payload,
-    CCNxContentObjectFieldError_None
-} CCNxContentObjectFieldError;
-
-typedef enum {
-    CCNxManifestFieldError_Name,
-    CCNxManifestFieldError_Payload,
-    CCNxManifestFieldError_None
-} CCNxManifestFieldError;
-
-static CCNxInterestFieldError
-_validInterestPair(CCNxInterest *egress, CCNxInterest *ingress)
-{
-    if (ccnxInterest_GetHopLimit(egress) != ccnxInterest_GetHopLimit(ingress) + 1) {
-        return CCNxInterestFieldError_HopLimit;
-    }
-
-    if (ccnxInterest_GetLifetime(egress) != ccnxInterest_GetLifetime(ingress)) {
-        return CCNxInterestFieldError_Lifetime;
-    }
-
-    if (!ccnxName_Equals(ccnxInterest_GetName(egress), ccnxInterest_GetName(ingress))) {
-        return CCNxInterestFieldError_Name;
-    }
-
-    if (!parcBuffer_Equals(ccnxInterest_GetKeyIdRestriction(egress), ccnxInterest_GetKeyIdRestriction(ingress))) {
-        return CCNxInterestFieldError_KeyIdRestriction;
-    }
-
-    if (!parcBuffer_Equals(ccnxInterest_GetContentObjectHashRestriction(egress), ccnxInterest_GetContentObjectHashRestriction(ingress))) {
-        return CCNxInterestFieldError_ContentObjectHashRestriction;
-    }
-
-    return CCNxInterestFieldError_None;
-}
-
-static CCNxContentObjectFieldError
-_validContentPair(CCNxContentObject *egress, CCNxContentObject *ingress)
-{
-    return CCNxContentObjectFieldError_None;
-}
-
-static CCNxManifestFieldError
-_validManifestPair(CCNxManifest *egress, CCNxManifest *ingress)
-{
-    return CCNxManifestFieldError_None;
-}
-
-static PARCBuffer *
-_encodeDictionary(const CCNxTlvDictionary *dict)
-{
-    PARCSigner *signer = ccnxValidationCRC32C_CreateSigner();
-    CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode((CCNxTlvDictionary *) dict, signer);
-    const struct iovec *array = ccnxCodecNetworkBufferIoVec_GetArray(iovec);
-    size_t iovcnt = ccnxCodecNetworkBufferIoVec_GetCount((CCNxCodecNetworkBufferIoVec *) iovec);
-
-    size_t totalbytes = 0;
-    for (int i = 0; i < iovcnt; i++) {
-        totalbytes += array[i].iov_len;
-    }
-    PARCBuffer *buffer = parcBuffer_Allocate(totalbytes);
-    for (int i = 0; i < iovcnt; i++) {
-        parcBuffer_PutArray(buffer, array[i].iov_len, array[i].iov_base);
-    }
-    parcBuffer_Flip(buffer);
-
-    ccnxCodecNetworkBufferIoVec_Release(&iovec);
-    parcSigner_Release(&signer);
-
-    return buffer;
-}
-
-static PARCBuffer *
-_computeMessageHash(CCNxTlvDictionary *dictionary)
-{
-    CCNxWireFormatMessageInterface *wireFacade = ccnxWireFormatMessageInterface_GetInterface(dictionary);
-    PARCCryptoHash *hash = wireFacade->computeContentObjectHash(dictionary);
-
-    PARCBuffer *digest = parcBuffer_Acquire(parcCryptoHash_GetDigest(hash));
-    parcCryptoHash_Release(&hash);
-
-    return digest;
-}
+// typedef enum {
+//     CCNxInterestFieldError_Name,
+//     CCNxInterestFieldError_Lifetime,
+//     CCNxInterestFieldError_HopLimit,
+//     CCNxInterestFieldError_KeyIdRestriction,
+//     CCNxInterestFieldError_ContentObjectHashRestriction,
+//     CCNxInterestFieldError_None
+// } CCNxInterestFieldError;
+//
+// typedef enum {
+//     CCNxContentObjectFieldError_Name,
+//     CCNxContentObjectFieldError_Payload,
+//     CCNxContentObjectFieldError_None
+// } CCNxContentObjectFieldError;
+//
+// typedef enum {
+//     CCNxManifestFieldError_Name,
+//     CCNxManifestFieldError_Payload,
+//     CCNxManifestFieldError_None
+// } CCNxManifestFieldError;
+//
+// static CCNxInterestFieldError
+// _validInterestPair(CCNxInterest *egress, CCNxInterest *ingress)
+// {
+//     if (ccnxInterest_GetHopLimit(egress) != ccnxInterest_GetHopLimit(ingress) + 1) {
+//         return CCNxInterestFieldError_HopLimit;
+//     }
+//
+//     if (ccnxInterest_GetLifetime(egress) != ccnxInterest_GetLifetime(ingress)) {
+//         return CCNxInterestFieldError_Lifetime;
+//     }
+//
+//     if (!ccnxName_Equals(ccnxInterest_GetName(egress), ccnxInterest_GetName(ingress))) {
+//         return CCNxInterestFieldError_Name;
+//     }
+//
+//     if (!parcBuffer_Equals(ccnxInterest_GetKeyIdRestriction(egress), ccnxInterest_GetKeyIdRestriction(ingress))) {
+//         return CCNxInterestFieldError_KeyIdRestriction;
+//     }
+//
+//     if (!parcBuffer_Equals(ccnxInterest_GetContentObjectHashRestriction(egress), ccnxInterest_GetContentObjectHashRestriction(ingress))) {
+//         return CCNxInterestFieldError_ContentObjectHashRestriction;
+//     }
+//
+//     return CCNxInterestFieldError_None;
+// }
+//
+// static CCNxContentObjectFieldError
+// _validContentPair(CCNxContentObject *egress, CCNxContentObject *ingress)
+// {
+//     return CCNxContentObjectFieldError_None;
+// }
+//
+// static CCNxManifestFieldError
+// _validManifestPair(CCNxManifest *egress, CCNxManifest *ingress)
+// {
+//     return CCNxManifestFieldError_None;
+// }
+//
+// static PARCBuffer *
+// _encodeDictionary(const CCNxTlvDictionary *dict)
+// {
+//     PARCSigner *signer = ccnxValidationCRC32C_CreateSigner();
+//     CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode((CCNxTlvDictionary *) dict, signer);
+//     const struct iovec *array = ccnxCodecNetworkBufferIoVec_GetArray(iovec);
+//     size_t iovcnt = ccnxCodecNetworkBufferIoVec_GetCount((CCNxCodecNetworkBufferIoVec *) iovec);
+//
+//     size_t totalbytes = 0;
+//     for (int i = 0; i < iovcnt; i++) {
+//         totalbytes += array[i].iov_len;
+//     }
+//     PARCBuffer *buffer = parcBuffer_Allocate(totalbytes);
+//     for (int i = 0; i < iovcnt; i++) {
+//         parcBuffer_PutArray(buffer, array[i].iov_len, array[i].iov_base);
+//     }
+//     parcBuffer_Flip(buffer);
+//
+//     ccnxCodecNetworkBufferIoVec_Release(&iovec);
+//     parcSigner_Release(&signer);
+//
+//     return buffer;
+// }
+//
 
 static CCNxName *
 _createRandomName(char *prefix)
@@ -501,7 +491,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_1(CCNxTestrig *rig, char *testCas
     CCNxName *testName = _createRandomName("ccnx:/test/b");
     PARCBuffer *testPayload = parcBuffer_Allocate(1024);
     CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
-    PARCBuffer *hash = _computeMessageHash(content);
+    PARCBuffer *hash = ccnxTestrigPacketUtility_ComputeMessageHash(content);
 
     CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, hash);
 
@@ -578,7 +568,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_3(CCNxTestrig *rig, char *testCas
     CCNxKeyLocator *keyLocator = ccnxKeyLocator_CreateFromKeyLink(keyURILink);
 
     ccnxContentObject_SetSignature(content, keyId, signature, keyLocator);
-    PARCBuffer *hash = _computeMessageHash(content);
+    PARCBuffer *hash = ccnxTestrigPacketUtility_ComputeMessageHash(content);
 
     CCNxInterest *interest = ccnxInterest_Create(testName, 1000, keyId, hash);
 
@@ -607,7 +597,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictions_4(CCNxTestrig *rig, char *testCas
     CCNxName *testName = _createRandomName("ccnx:/test/b");
     PARCBuffer *testPayload = parcBuffer_Allocate(1024);
     CCNxContentObject *content = ccnxContentObject_CreateWithPayload(testPayload);
-    PARCBuffer *hash = _computeMessageHash(content);
+    PARCBuffer *hash = ccnxTestrigPacketUtility_ComputeMessageHash(content);
 
     CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, hash);
 
@@ -823,7 +813,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_6(CCNxTestrig *rig, char *te
     CCNxKeyLocator *keyLocator = ccnxKeyLocator_CreateFromKeyLink(keyURILink);
 
     ccnxContentObject_SetSignature(content, keyId, signature, keyLocator);
-    PARCBuffer *hash = _computeMessageHash(content);
+    PARCBuffer *hash = ccnxTestrigPacketUtility_ComputeMessageHash(content);
 
     PARCBuffer *randomKeyId = parcBuffer_AllocateCString("this is a key id");
     CCNxInterest *interest = ccnxInterest_Create(testName, 1000, randomKeyId, hash);
