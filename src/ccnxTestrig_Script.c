@@ -91,20 +91,26 @@ parcObject_Override(
 
 struct ccnx_testrig_script_step {
     int stepIndex;
-    CCNxTestrigLinkID linkId;
     CCNxTlvDictionary *packet;
-    bool send;
 
-    // Receive step conditions
-    // XX fix this.
+    // Step link information
+    PARCBitVector *linkVector;
+
+    // Execute function pointer
+    CCNxTestrigSuiteTestResult *(*execute)(CCNxTestrigScriptStep *, CCNxTestrigSuiteTestResult *, CCNxTestrig *);
+
+    // Execute parameters
     CCNxTestrigScriptStep *reference;
-    bool nullCheck;
-    char *failureMessage;
+
+    // Result parameters
+    PARCBitVector *receivedLinkVector;
 };
 
 static bool
 _ccnxTestrigScriptStep_Destructor(CCNxTestrigScriptStep **resultPtr)
 {
+    CCNxTestrigScriptStep *step = *resultPtr;
+    parcBitVector_Release(&step->linkVector);
     return true;
 }
 
@@ -115,35 +121,195 @@ parcObject_Override(
 	CCNxTestrigScriptStep, PARCObject,
 	.destructor = (PARCObjectDestructor *) _ccnxTestrigScriptStep_Destructor);
 
+static CCNxTestrigSuiteTestResult *
+_ccnxTestrigScript_ExecuteSendStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
+{
+    PARCBuffer *packetBuffer = ccnxTestrigPacketUtility_EncodePacket(step->packet);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, parcBitVector_NextBitSet(step->linkVector, 0)), packetBuffer);
+    ccnxTestrigSuiteTestResult_LogPacket(result, packetBuffer);
+    return result;
+}
+
+static CCNxTestrigSuiteTestResult *
+_ccnxTestrigScript_ExecuteReceiveAllStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
+{
+    bool succeeded = true;
+    int currentBit = 0;
+
+    step->receivedLinkVector = parcBitVector_Create();
+
+    for (size_t i = 0; i < parcBitVector_NumberOfBitsSet(step->linkVector); i++) {
+        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit);
+
+        PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, currentBit), 1000);
+        if (receiveBuffer == NULL) {
+            ccnxTestrigSuiteTestResult_SetFail(result, "Failed to receive a message in the allotted time.");
+            return result;
+        }
+
+        parcBitVector_Set(step->receivedLinkVector, currentBit);
+
+        CCNxTlvDictionary *referencedMessage = (step->reference)->packet;
+        CCNxMetaMessage *reconstructedMessage = ccnxMetaMessage_CreateFromWireFormatBuffer(receiveBuffer);
+
+        // Check that the message types are equal
+        if (!(ccnxMetaMessage_IsInterest(reconstructedMessage) == ccnxTlvDictionary_IsInterest(referencedMessage))) {
+            ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (INTEREST)");
+            return result;
+        }
+        if (!(ccnxMetaMessage_IsContentObject(reconstructedMessage) == ccnxTlvDictionary_IsContentObject(referencedMessage))) {
+            ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (CONTENT)");
+            return result;
+        }
+        if (!(ccnxMetaMessage_IsManifest(reconstructedMessage) == ccnxTlvDictionary_IsManifest(referencedMessage))) {
+            ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (MANIFEST)");
+            return result;
+        }
+
+        result = ccnxTestrigPacketUtility_IsValidPacketPair(referencedMessage, reconstructedMessage, result);
+    }
+
+    return result;
+}
+
+static CCNxTestrigSuiteTestResult *
+_ccnxTestrigScript_ExecuteReceiveOneStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
+{
+    bool succeeded = false;
+    int currentBit = 0;
+    step->receivedLinkVector = parcBitVector_Create();
+    for (size_t i = 0; i < parcBitVector_NumberOfBitsSet(step->linkVector); i++) {
+        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit);
+
+        PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, currentBit), 1000);
+        if (receiveBuffer == NULL) {
+            continue;
+        }
+
+        parcBitVector_Set(step->receivedLinkVector, currentBit);
+
+        CCNxTlvDictionary *referencedMessage = (step->reference)->packet;
+        CCNxMetaMessage *reconstructedMessage = ccnxMetaMessage_CreateFromWireFormatBuffer(receiveBuffer);
+
+        // Check that the message types are equal
+        if (!(ccnxMetaMessage_IsInterest(reconstructedMessage) == ccnxTlvDictionary_IsInterest(referencedMessage))) {
+            ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (INTEREST)");
+            return result;
+        }
+        if (!(ccnxMetaMessage_IsContentObject(reconstructedMessage) == ccnxTlvDictionary_IsContentObject(referencedMessage))) {
+            ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (CONTENT)");
+            return result;
+        }
+        if (!(ccnxMetaMessage_IsManifest(reconstructedMessage) == ccnxTlvDictionary_IsManifest(referencedMessage))) {
+            ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (MANIFEST)");
+            return result;
+        }
+
+        result = ccnxTestrigPacketUtility_IsValidPacketPair(referencedMessage, reconstructedMessage, result);
+    }
+
+    if (!succeeded) {
+        ccnxTestrigSuiteTestResult_SetFail(result, "Did not receive any message on the specified links.");
+    }
+
+    return result;
+}
+
+static CCNxTestrigSuiteTestResult *
+_ccnxTestrigScript_ExecuteReceiveNoneStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
+{
+    bool succeeded = false;
+    int currentBit = 0;
+    step->receivedLinkVector = parcBitVector_Create();
+    for (size_t i = 0; i < parcBitVector_NumberOfBitsSet(step->linkVector); i++) {
+        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit);
+
+        PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, currentBit), 1000);
+        if (receiveBuffer != NULL) {
+            parcBitVector_Set(step->receivedLinkVector, currentBit);
+            ccnxTestrigSuiteTestResult_SetFail(result, "Received a message when we expected not to.");
+            break;
+        }
+    }
+    return result;
+}
+
+static CCNxTestrigSuiteTestResult *
+_ccnxTestrigScript_ExecuteStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
+{
+    return step->execute(step, result, rig);
+}
+
 static CCNxTestrigScriptStep *
 _ccnxTestrigScriptStep_CreateSendStep(int index, CCNxTestrigLinkID linkId, CCNxTlvDictionary *messageDictionary)
 {
     CCNxTestrigScriptStep *step = parcObject_CreateInstance(CCNxTestrigScriptStep);
     if (step != NULL) {
         step->stepIndex = index;
-        step->linkId = linkId;
         step->packet = ccnxTlvDictionary_Acquire(messageDictionary);
-        step->send = true;
         step->reference = NULL;
-        step->failureMessage = NULL;
-        step->nullCheck = false;
+        step->execute = _ccnxTestrigScript_ExecuteSendStep;
+
+        step->linkVector = parcBitVector_Create();
+        parcBitVector_Set(step->linkVector, linkId);
     }
     return step;
 }
 
 static CCNxTestrigScriptStep *
-_ccnxTestrigScriptStep_CreateReceiveStep(int index, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *reference, bool nullCheck, char *failureMessage)
+_ccnxTestrigScriptStep_CreateRespondStep(int index, CCNxTestrigScriptStep *reference, CCNxTlvDictionary *packet)
 {
     CCNxTestrigScriptStep *step = parcObject_CreateInstance(CCNxTestrigScriptStep);
     if (step != NULL) {
         step->stepIndex = index;
-        step->linkId = linkId;
+        step->packet = ccnxTlvDictionary_Acquire(packet);
+        step->reference = NULL;
+        step->execute = _ccnxTestrigScript_ExecuteSendStep;
+        step->linkVector = parcBitVector_Acquire(reference->receivedLinkVector);
+    }
+    return step;
+}
+
+static CCNxTestrigScriptStep *
+_ccnxTestrigScriptStep_CreateReceive(int index, CCNxTestrigScriptStep *reference, PARCBitVector *linkVector)
+{
+    CCNxTestrigScriptStep *step = parcObject_CreateInstance(CCNxTestrigScriptStep);
+    if (step != NULL) {
+        step->stepIndex = index;
         step->packet = NULL;
-        step->send = false;
         step->reference = ccnxTestrigScriptStep_Acquire(reference);
 
-        step->failureMessage = parcMemory_StringDuplicate(failureMessage, strlen(failureMessage));
-        step->nullCheck = nullCheck;
+        step->linkVector = parcBitVector_Acquire(linkVector);
+    }
+    return step;
+}
+
+static CCNxTestrigScriptStep *
+_ccnxTestrigScriptStep_CreateReceiveAllStep(int index, CCNxTestrigScriptStep *reference, PARCBitVector *linkVector)
+{
+    CCNxTestrigScriptStep *step = _ccnxTestrigScriptStep_CreateReceive(index, reference, linkVector);
+    if (step != NULL) {
+        step->execute = _ccnxTestrigScript_ExecuteReceiveAllStep;
+    }
+    return step;
+}
+
+static CCNxTestrigScriptStep *
+_ccnxTestrigScriptStep_CreateReceiveNoneStep(int index, CCNxTestrigScriptStep *reference, PARCBitVector *linkVector)
+{
+    CCNxTestrigScriptStep *step = _ccnxTestrigScriptStep_CreateReceive(index, reference, linkVector);
+    if (step != NULL) {
+        step->execute = _ccnxTestrigScript_ExecuteReceiveNoneStep;
+    }
+    return step;
+}
+
+static CCNxTestrigScriptStep *
+_ccnxTestrigScriptStep_CreateReceiveOneStep(int index, CCNxTestrigScriptStep *reference, PARCBitVector *linkVector)
+{
+    CCNxTestrigScriptStep *step = _ccnxTestrigScriptStep_CreateReceive(index, reference, linkVector);
+    if (step != NULL) {
+        step->execute = _ccnxTestrigScript_ExecuteReceiveOneStep;
     }
     return step;
 }
@@ -163,7 +329,7 @@ ccnxTestrigScript_Create(char *testCase)
 }
 
 CCNxTestrigScriptStep *
-ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTlvDictionary *messageDictionary)
+ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTlvDictionary *messageDictionary, CCNxTestrigLinkID linkId)
 {
     size_t index = parcLinkedList_Size(script->steps);
     CCNxTestrigScriptStep *step = _ccnxTestrigScriptStep_CreateSendStep(index, linkId, messageDictionary);
@@ -172,69 +338,39 @@ ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkI
 }
 
 CCNxTestrigScriptStep *
-ccnxTestrigScript_AddReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage)
+ccnxTestrigScript_AddRespondStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTlvDictionary *packet)
 {
     size_t index = parcLinkedList_Size(script->steps);
-    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, step, false, failureMessage);
+    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateRespondStep(index, step, packet);
     parcLinkedList_Append(script->steps, newStep);
     return newStep;
 }
 
 CCNxTestrigScriptStep *
-ccnxTestrigScript_AddNullReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage)
+ccnxTestrigScript_AddReceiveOneStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, PARCBitVector *linkVector)
 {
     size_t index = parcLinkedList_Size(script->steps);
-    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveStep(index, linkId, step, true, failureMessage);
+    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveOneStep(index, step, linkVector);
     parcLinkedList_Append(script->steps, newStep);
     return newStep;
 }
 
-static CCNxTestrigSuiteTestResult *
-_ccnxTestrigScript_ExecuteSendStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
+CCNxTestrigScriptStep *
+ccnxTestrigScript_AddReceiveNoneStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, PARCBitVector *linkVector)
 {
-    PARCBuffer *packetBuffer = ccnxTestrigPacketUtility_EncodePacket(step->packet);
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, step->linkId), packetBuffer);
-    ccnxTestrigSuiteTestResult_LogPacket(result, packetBuffer);
-    return result;
+    size_t index = parcLinkedList_Size(script->steps);
+    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveNoneStep(index, step, linkVector);
+    parcLinkedList_Append(script->steps, newStep);
+    return newStep;
 }
 
-static CCNxTestrigSuiteTestResult *
-_ccnxTestrigScript_ExecuteReceiveStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
+CCNxTestrigScriptStep *
+ccnxTestrigScript_AddReceiveAllStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, PARCBitVector *linkVector)
 {
-    PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, step->linkId), 1000);
-    if (receiveBuffer == NULL && step->nullCheck) {
-        ccnxTestrigSuiteTestResult_SetFail(result, step->failureMessage);
-        return result;
-    }
-
-    CCNxTlvDictionary *referencedMessage = (step->reference)->packet;
-    CCNxMetaMessage *reconstructedMessage = ccnxMetaMessage_CreateFromWireFormatBuffer(receiveBuffer);
-
-    // Check that the message types are equal
-    if (!(ccnxMetaMessage_IsInterest(reconstructedMessage) == ccnxTlvDictionary_IsInterest(referencedMessage))) {
-        ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (INTEREST)");
-        return result;
-    }
-    if (!(ccnxMetaMessage_IsContentObject(reconstructedMessage) == ccnxTlvDictionary_IsContentObject(referencedMessage))) {
-        ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (CONTENT)");
-        return result;
-    }
-    if (!(ccnxMetaMessage_IsManifest(reconstructedMessage) == ccnxTlvDictionary_IsManifest(referencedMessage))) {
-        ccnxTestrigSuiteTestResult_SetFail(result, "The received message type does not match the sent message type (MANIFEST)");
-        return result;
-    }
-
-    return ccnxTestrigPacketUtility_IsValidPacketPair(referencedMessage, reconstructedMessage, result);
-}
-
-static CCNxTestrigSuiteTestResult *
-_ccnxTestrigScript_ExecuteStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
-{
-    if (step->send) {
-        return _ccnxTestrigScript_ExecuteSendStep(script, step, result, rig);
-    } else {
-        return _ccnxTestrigScript_ExecuteReceiveStep(script, step, result, rig);
-    }
+    size_t index = parcLinkedList_Size(script->steps);
+    CCNxTestrigScriptStep *newStep = _ccnxTestrigScriptStep_CreateReceiveAllStep(index, step, linkVector);
+    parcLinkedList_Append(script->steps, newStep);
+    return newStep;
 }
 
 CCNxTestrigSuiteTestResult *
@@ -246,7 +382,7 @@ ccnxTestrigScript_Execute(CCNxTestrigScript *script, CCNxTestrig *rig)
     for (int i = 0; i < numSteps; i++) {
         printf(">> Executing step %d\n", i);
         CCNxTestrigScriptStep *step = parcLinkedList_GetAtIndex(script->steps, i);
-        result = _ccnxTestrigScript_ExecuteStep(script, step, result, rig);
+        result = _ccnxTestrigScript_ExecuteStep(step, result, rig);
 
         // If the last step failed, stop the test and return the failure.
         if (ccnxTestrigSuiteTestResult_IsFailure(result)) {

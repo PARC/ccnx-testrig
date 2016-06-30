@@ -61,6 +61,8 @@
 #include <ccnx/common/ccnx_Interest.h>
 #include <ccnx/common/ccnx_ContentObject.h>
 
+#include <parc/algol/parc_BitVector.h>
+
 struct ccnx_testrig_script;
 typedef struct ccnx_testrig_script CCNxTestrigScript;
 
@@ -86,7 +88,30 @@ CCNxTestrigScript *ccnxTestrigScript_Create(char *testCase);
  * packet to the specified link.
  *
  * @param [in] script A `CCNxTestrigScript` instance.
+ * @param [in] packet The `CCNxTlvDictionary` to send.
  * @param [in] linkId The link to which the packet should be sent.
+ *
+ * @return The `CCNxTestrigScriptStep` instance that refers to this step.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
+ *
+ *     CCNxTlvDictionary *packet = ...
+ *     CCNxTestrigScriptStep *sendStep = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, packet);
+ * }
+ * @endcode
+ */
+CCNxTestrigScriptStep *ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTlvDictionary *packet, CCNxTestrigLinkID linkId);
+
+/**
+ * XXX CAW
+ * Add a "respond step" to the test case. When executed, this will send the specified
+ * packet to the links that received packets in the referenced step.
+ *
+ * @param [in] script A `CCNxTestrigScript` instance.
+ * @param [in] step The referenced `CCNxTestrigScriptStep` instance.
  * @param [in] packet The `CCNxTlvDictionary` to send.
  *
  * @return The `CCNxTestrigScriptStep` instance that refers to this step.
@@ -94,65 +119,72 @@ CCNxTestrigScript *ccnxTestrigScript_Create(char *testCase);
  * Example:
  * @code
  * {
- *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
- *
- *     CCNxTlvDictionary *packet = ...
- *     CCNxTestrigScriptStep *sendStep = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, packet);
+ *     XXX
  * }
  * @endcode
  */
-CCNxTestrigScriptStep *ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTlvDictionary *packet);
+CCNxTestrigScriptStep *ccnxTestrigScript_AddRespondStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTlvDictionary *packet);
 
 /**
+ * XXX CAW
  * Add a "receive step" to the test case. When executed, this step will receive a packet
  * from the specified link and verify that it matches that which was sent in the
  * corresponding send step. If not, the failure message is used for the execution result.
  *
  * @param [in] script A `CCNxTestrigScript` instance.
- * @param [in] linkId The link to which the packet should be sent.
  * @param [in] step The referncing `CCNxTestrigScriptStep` step.
- * @param [in] failureMessage The failure message to use when the received packet does not match that which was sent.
+ * @param [in] linkVector The links upon which packets should be received.
  *
  * @return The `CCNxTestrigScriptStep` instance that refers to this step.
  *
  * Example:
  * @code
  * {
- *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
- *
- *     CCNxTlvDictionary *packet = ...
- *     CCNxTestrigScriptStep *sendStep = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, packet);
- *
- *     CCNxTestrigScriptStep *receiveStep = ccnxTestrigScript_AddReceiveStep(script, CCNxTestrigLinkID_LinkB, sendStep, "failed to get the message");
+ *     XXX
  * }
  * @endcode
  */
-CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage);
+CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveOneStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, PARCBitVector *linkVector);
 
 /**
+ * XXX CAW
  * Add a "null receive step" to the test case. When executed, this step will
  * attempt to receive a packet from the specified link and verify that it failed.
  *
  * @param [in] script A `CCNxTestrigScript` instance.
- * @param [in] linkId The link to which the packet should be sent.
  * @param [in] step The referncing `CCNxTestrigScriptStep` step.
- * @param [in] failureMessage The failure message to use when the received packet does not match that which was sent.
+ * @param [in] linkVector The links upon which packet receipt should be checked.
  *
  * @return The `CCNxTestrigScriptStep` instance that refers to this step.
  *
  * Example:
  * @code
  * {
- *     CCNxTestrigScript *script = ccnxTestrigScript_Create("special test case");
- *
- *     CCNxTlvDictionary *packet = ...
- *     CCNxTestrigScriptStep *sendStep = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, packet);
- *
- *     CCNxTestrigScriptStep *failedReceiveStep = ccnxTestrigScript_AddNullReceiveStep(script, CCNxTestrigLinkID_LinkB, sendStep, "failed to get the message");
+ *     XXX
  * }
  * @endcode
  */
-CCNxTestrigScriptStep *ccnxTestrigScript_AddNullReceiveStep(CCNxTestrigScript *script, CCNxTestrigLinkID linkId, CCNxTestrigScriptStep *step, char *failureMessage);
+CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveNoneStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, PARCBitVector *linkVector);
+
+/**
+ * XXX CAW
+ * Add a "receive all step" to the test case. When executed, this step will
+ * attempt to receive a packet from every specified link and fail if it doesn't succeed.
+ *
+ * @param [in] script A `CCNxTestrigScript` instance
+ * @param [in] step The referencing `CCNxTestrigScriptStep` step.
+ * @param [in] linkVector The links upon which packets should be received.
+ *
+ * @return The `CCNxTestrigScriptStep` instance that refers to this step.
+ *
+ * Example:
+ * @code
+ * {
+ *     XXX
+ * }
+ * @endcode
+ */
+CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveAllStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, PARCBitVector *linkVector);
 
 /**
  * Execute the test script and return the result.

@@ -55,6 +55,8 @@
 #ifndef ccnx_testrig_h
 #define ccnx_testrig_h
 
+#include <parc/algol/parc_BitVector.h>
+
 #include "ccnxTestrig_Link.h"
 #include "ccnxTestrig_Reporter.h"
 
@@ -64,7 +66,8 @@ typedef struct ccnx_testrig CCNxTestrig;
 typedef enum {
     CCNxTestrigLinkID_LinkA,
     CCNxTestrigLinkID_LinkB,
-    CCNxTestrigLinkID_LinkC
+    CCNxTestrigLinkID_LinkC,
+    CCNxTestrigLinkID_NULL
 } CCNxTestrigLinkID;
 
 /**
@@ -92,9 +95,26 @@ CCNxTestrigReporter *ccnxTestrig_GetReporter(CCNxTestrig *rig);
  * @code
  * {
  *     CCNxTestrig *rig = ...
- *     CCNxTestrigLink *linkA = ccnxTestrig_GetLinkByID(CCNxTestrigLinkID_LinkA);
+ *     CCNxTestrigLink *linkA = ccnxTestrig_GetLinkByID(rig, CCNxTestrigLinkID_LinkA);
  * }
  * @endcode
  */
 CCNxTestrigLink *ccnxTestrig_GetLinkByID(CCNxTestrig *rig, CCNxTestrigLinkID linkID);
+
+/**
+ * Retrieve a bit vector that encodes the links given in the variable argument list.
+ *
+ * @param [in] rig A `CCNxTestrig` instance.
+ * @param [in] linkID A CCNxTestrigLinkID corresponding to one of the forwarder-under-test links.
+ * ...
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrig *rig = ...
+ *     PARCBitVector *linkVector = ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA);
+ * }
+ * @endcode
+ */
+PARCBitVector *ccnxTestrig_GetLinkVector(CCNxTestrig *rig, CCNxTestrigLinkID linkID, ...);
 #endif // ccnx_testrig_h

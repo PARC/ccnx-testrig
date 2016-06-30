@@ -182,9 +182,26 @@ ccnxTestrig_GetLinkByID(CCNxTestrig *rig, CCNxTestrigLinkID linkID)
             return _ccnxTestrig_GetLinkB(rig);
         case CCNxTestrigLinkID_LinkC:
             return _ccnxTestrig_GetLinkC(rig);
+        default:
+        break;
     }
 
     return NULL;
+}
+
+PARCBitVector *
+ccnxTestrig_GetLinkVector(CCNxTestrig *rig, CCNxTestrigLinkID linkID, ...)
+{
+    PARCBitVector *vector = parcBitVector_Create();
+
+    va_list linkList;
+    va_start(linkList, linkID);
+    parcBitVector_Set(vector, linkID);
+    for (CCNxTestrigLinkID id = linkID; id != CCNxTestrigLinkID_NULL; id = va_arg(linkList, CCNxTestrigLinkID)) {
+        parcBitVector_Set(vector, id);
+    }
+
+    return vector;
 }
 
 void
