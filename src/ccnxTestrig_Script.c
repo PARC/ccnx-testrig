@@ -125,7 +125,8 @@ static CCNxTestrigSuiteTestResult *
 _ccnxTestrigScript_ExecuteSendStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
 {
     PARCBuffer *packetBuffer = ccnxTestrigPacketUtility_EncodePacket(step->packet);
-    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, parcBitVector_NextBitSet(step->linkVector, 0)), packetBuffer);
+    unsigned linkMask = parcBitVector_NextBitSet(step->linkVector, 0);
+    ccnxTestrigLink_Send(ccnxTestrig_GetLinkByID(rig, linkMask), packetBuffer);
     ccnxTestrigSuiteTestResult_LogPacket(result, packetBuffer);
     return result;
 }
@@ -134,14 +135,12 @@ static CCNxTestrigSuiteTestResult *
 _ccnxTestrigScript_ExecuteReceiveAllStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
 {
     bool succeeded = true;
-    int currentBit = 0;
-
-    step->receivedLinkVector = parcBitVector_Create();
-
+    int currentBit = -1;
     for (size_t i = 0; i < parcBitVector_NumberOfBitsSet(step->linkVector); i++) {
-        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit);
+        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit + 1);
 
-        PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, currentBit), 1000);
+        CCNxTestrigLink *link = ccnxTestrig_GetLinkByID(rig, currentBit);
+        PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(link, 1000);
         if (receiveBuffer == NULL) {
             ccnxTestrigSuiteTestResult_SetFail(result, "Failed to receive a message in the allotted time.");
             return result;
@@ -176,12 +175,13 @@ static CCNxTestrigSuiteTestResult *
 _ccnxTestrigScript_ExecuteReceiveOneStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
 {
     bool succeeded = false;
-    int currentBit = 0;
-    step->receivedLinkVector = parcBitVector_Create();
+    bool failedAfterReceive = false;
+    int currentBit = -1;
     for (size_t i = 0; i < parcBitVector_NumberOfBitsSet(step->linkVector); i++) {
-        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit);
+        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit + 1);
 
-        PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, currentBit), 1000);
+        CCNxTestrigLink *link = ccnxTestrig_GetLinkByID(rig, currentBit);
+        PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(link, 1000);
         if (receiveBuffer == NULL) {
             continue;
         }
@@ -206,9 +206,14 @@ _ccnxTestrigScript_ExecuteReceiveOneStep(CCNxTestrigScriptStep *step, CCNxTestri
         }
 
         result = ccnxTestrigPacketUtility_IsValidPacketPair(referencedMessage, reconstructedMessage, result);
+        if (!ccnxTestrigSuiteTestResult_IsFailure(result)) {
+            succeeded = true;
+        } else {
+            failedAfterReceive = true;
+        }
     }
 
-    if (!succeeded) {
+    if (!succeeded && !failedAfterReceive) {
         ccnxTestrigSuiteTestResult_SetFail(result, "Did not receive any message on the specified links.");
     }
 
@@ -219,10 +224,9 @@ static CCNxTestrigSuiteTestResult *
 _ccnxTestrigScript_ExecuteReceiveNoneStep(CCNxTestrigScriptStep *step, CCNxTestrigSuiteTestResult *result, CCNxTestrig *rig)
 {
     bool succeeded = false;
-    int currentBit = 0;
-    step->receivedLinkVector = parcBitVector_Create();
+    int currentBit = -1;
     for (size_t i = 0; i < parcBitVector_NumberOfBitsSet(step->linkVector); i++) {
-        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit);
+        currentBit = parcBitVector_NextBitSet(step->linkVector, currentBit + 1);
 
         PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(ccnxTestrig_GetLinkByID(rig, currentBit), 1000);
         if (receiveBuffer != NULL) {
@@ -250,6 +254,7 @@ _ccnxTestrigScriptStep_CreateSendStep(int index, CCNxTestrigLinkID linkId, CCNxT
         step->reference = NULL;
         step->execute = _ccnxTestrigScript_ExecuteSendStep;
 
+        step->receivedLinkVector = parcBitVector_Create();
         step->linkVector = parcBitVector_Create();
         parcBitVector_Set(step->linkVector, linkId);
     }
@@ -265,6 +270,7 @@ _ccnxTestrigScriptStep_CreateRespondStep(int index, CCNxTestrigScriptStep *refer
         step->packet = ccnxTlvDictionary_Acquire(packet);
         step->reference = NULL;
         step->execute = _ccnxTestrigScript_ExecuteSendStep;
+        step->receivedLinkVector = parcBitVector_Create();
         step->linkVector = parcBitVector_Acquire(reference->receivedLinkVector);
     }
     return step;
@@ -280,6 +286,7 @@ _ccnxTestrigScriptStep_CreateReceive(int index, CCNxTestrigScriptStep *reference
         step->reference = ccnxTestrigScriptStep_Acquire(reference);
 
         step->linkVector = parcBitVector_Acquire(linkVector);
+        step->receivedLinkVector = parcBitVector_Create();
     }
     return step;
 }
@@ -379,9 +386,9 @@ ccnxTestrigScript_Execute(CCNxTestrigScript *script, CCNxTestrig *rig)
     int numSteps = parcLinkedList_Size(script->steps);
     CCNxTestrigSuiteTestResult *result = ccnxTestrigSuiteTestResult_Create(script->testCase);
 
-    for (int i = 0; i < numSteps; i++) {
+    for (int i = 1; i <= numSteps; i++) {
         printf(">> Executing step %d\n", i);
-        CCNxTestrigScriptStep *step = parcLinkedList_GetAtIndex(script->steps, i);
+        CCNxTestrigScriptStep *step = parcLinkedList_GetAtIndex(script->steps, i - 1);
         result = _ccnxTestrigScript_ExecuteStep(step, result, rig);
 
         // If the last step failed, stop the test and return the failure.

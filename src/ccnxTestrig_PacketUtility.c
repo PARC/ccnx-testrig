@@ -98,10 +98,16 @@ _validManifestPair(CCNxManifest *egress, CCNxManifest *ingress)
 CCNxTestrigSuiteTestResult *
 ccnxTestrigPacketUtility_IsValidPacketPair(CCNxTlvDictionary *sent, CCNxMetaMessage *received, CCNxTestrigSuiteTestResult *result)
 {
+    // XXX: stringify the error conditions for more meaningful outputs
+
     if (ccnxTlvDictionary_IsInterest(sent)) {
         CCNxInterest *receivedInterest = ccnxMetaMessage_GetInterest(received);
-        if (_validInterestPair(sent, receivedInterest) != CCNxInterestFieldError_None) {
-            result = ccnxTestrigSuiteTestResult_SetFail(result, "An interest field was incorrect");
+        CCNxInterestFieldError error = _validInterestPair(sent, receivedInterest);
+        if (error != CCNxInterestFieldError_None) {
+            char *reason = NULL;
+            asprintf(&reason, "An interest field was incorrect: %d", error);
+            result = ccnxTestrigSuiteTestResult_SetFail(result, reason);
+            free(reason);
         }
     } else if (ccnxTlvDictionary_IsContentObject(sent)) {
         CCNxContentObject *receivedContent = ccnxMetaMessage_GetContentObject(received);

@@ -69,107 +69,30 @@
 
 #include <ccnx/common/validation/ccnxValidation_CRC32C.h>
 
+#include <parc/security/parc_SecureRandom.h>
+
 #include "ccnxTestrig.h"
 #include "ccnxTestrig_Suite.h"
 #include "ccnxTestrig_SuiteTestResult.h"
 #include "ccnxTestrig_Script.h"
 #include "ccnxTestrig_PacketUtility.h"
 
-// typedef enum {
-//     CCNxInterestFieldError_Name,
-//     CCNxInterestFieldError_Lifetime,
-//     CCNxInterestFieldError_HopLimit,
-//     CCNxInterestFieldError_KeyIdRestriction,
-//     CCNxInterestFieldError_ContentObjectHashRestriction,
-//     CCNxInterestFieldError_None
-// } CCNxInterestFieldError;
-//
-// typedef enum {
-//     CCNxContentObjectFieldError_Name,
-//     CCNxContentObjectFieldError_Payload,
-//     CCNxContentObjectFieldError_None
-// } CCNxContentObjectFieldError;
-//
-// typedef enum {
-//     CCNxManifestFieldError_Name,
-//     CCNxManifestFieldError_Payload,
-//     CCNxManifestFieldError_None
-// } CCNxManifestFieldError;
-//
-// static CCNxInterestFieldError
-// _validInterestPair(CCNxInterest *egress, CCNxInterest *ingress)
-// {
-//     if (ccnxInterest_GetHopLimit(egress) != ccnxInterest_GetHopLimit(ingress) + 1) {
-//         return CCNxInterestFieldError_HopLimit;
-//     }
-//
-//     if (ccnxInterest_GetLifetime(egress) != ccnxInterest_GetLifetime(ingress)) {
-//         return CCNxInterestFieldError_Lifetime;
-//     }
-//
-//     if (!ccnxName_Equals(ccnxInterest_GetName(egress), ccnxInterest_GetName(ingress))) {
-//         return CCNxInterestFieldError_Name;
-//     }
-//
-//     if (!parcBuffer_Equals(ccnxInterest_GetKeyIdRestriction(egress), ccnxInterest_GetKeyIdRestriction(ingress))) {
-//         return CCNxInterestFieldError_KeyIdRestriction;
-//     }
-//
-//     if (!parcBuffer_Equals(ccnxInterest_GetContentObjectHashRestriction(egress), ccnxInterest_GetContentObjectHashRestriction(ingress))) {
-//         return CCNxInterestFieldError_ContentObjectHashRestriction;
-//     }
-//
-//     return CCNxInterestFieldError_None;
-// }
-//
-// static CCNxContentObjectFieldError
-// _validContentPair(CCNxContentObject *egress, CCNxContentObject *ingress)
-// {
-//     return CCNxContentObjectFieldError_None;
-// }
-//
-// static CCNxManifestFieldError
-// _validManifestPair(CCNxManifest *egress, CCNxManifest *ingress)
-// {
-//     return CCNxManifestFieldError_None;
-// }
-//
-// static PARCBuffer *
-// _encodeDictionary(const CCNxTlvDictionary *dict)
-// {
-//     PARCSigner *signer = ccnxValidationCRC32C_CreateSigner();
-//     CCNxCodecNetworkBufferIoVec *iovec = ccnxCodecTlvPacket_DictionaryEncode((CCNxTlvDictionary *) dict, signer);
-//     const struct iovec *array = ccnxCodecNetworkBufferIoVec_GetArray(iovec);
-//     size_t iovcnt = ccnxCodecNetworkBufferIoVec_GetCount((CCNxCodecNetworkBufferIoVec *) iovec);
-//
-//     size_t totalbytes = 0;
-//     for (int i = 0; i < iovcnt; i++) {
-//         totalbytes += array[i].iov_len;
-//     }
-//     PARCBuffer *buffer = parcBuffer_Allocate(totalbytes);
-//     for (int i = 0; i < iovcnt; i++) {
-//         parcBuffer_PutArray(buffer, array[i].iov_len, array[i].iov_base);
-//     }
-//     parcBuffer_Flip(buffer);
-//
-//     ccnxCodecNetworkBufferIoVec_Release(&iovec);
-//     parcSigner_Release(&signer);
-//
-//     return buffer;
-// }
-//
-
 static CCNxName *
 _createRandomName(char *prefix)
 {
-    int nonce = rand();
     CCNxName *name = ccnxName_CreateFromCString(prefix);
-    char *suffix = NULL;
-    asprintf(&suffix, "%d", nonce);
+
+    PARCSecureRandom *random = parcSecureRandom_Create();
+    PARCBuffer *suffixBytes = parcBuffer_Allocate(16);
+    parcSecureRandom_NextBytes(random, suffixBytes);
+    parcBuffer_Flip(suffixBytes);
+    char *suffix = parcBuffer_ToHexString(suffixBytes);
+    parcBuffer_Release(&suffixBytes);
 
     CCNxName *full = ccnxName_ComposeNAME(name, suffix);
-    free(suffix);
+    parcMemory_Deallocate(&suffix);
     ccnxName_Release(&name);
+    parcSecureRandom_Release(&random);
 
     return full;
 }
@@ -186,7 +109,7 @@ ccnxTestrigSuite_FIBTest_BasicInterest_1a(CCNxTestrig *rig, char *testCaseName)
     CCNxTestrigScript *script = ccnxTestrigScript_Create(testCaseName);
     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkB));
-    CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, content, CCNxTestrigLinkID_LinkB);
+    CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddRespondStep(script, step2, content);
     CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveOneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
 
     CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
@@ -950,10 +873,16 @@ ccnxTestrigSuite_RunAll(CCNxTestrig *rig)
             ccnxTestrigSuiteTestResult_Report(result, reporter);
         }
 
+        if (ccnxTestrigSuiteTestResult_IsFailure(result)) {
+            break;
+        }
+
+        // Save the result
         parcLinkedList_Append(resultList, result);
         ccnxTestrigSuiteTestResult_Release(&result);
 
-        break;
+        // Flush the pipes
+        ccnxTestrig_FlushLinks(rig);
     }
 
     return resultList;

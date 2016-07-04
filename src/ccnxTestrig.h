@@ -64,9 +64,9 @@ struct ccnx_testrig;
 typedef struct ccnx_testrig CCNxTestrig;
 
 typedef enum {
-    CCNxTestrigLinkID_LinkA,
-    CCNxTestrigLinkID_LinkB,
-    CCNxTestrigLinkID_LinkC,
+    CCNxTestrigLinkID_LinkA = 0x01,
+    CCNxTestrigLinkID_LinkB = 0x02,
+    CCNxTestrigLinkID_LinkC = 0x03,
     CCNxTestrigLinkID_NULL
 } CCNxTestrigLinkID;
 
@@ -108,6 +108,8 @@ CCNxTestrigLink *ccnxTestrig_GetLinkByID(CCNxTestrig *rig, CCNxTestrigLinkID lin
  * @param [in] linkID A CCNxTestrigLinkID corresponding to one of the forwarder-under-test links.
  * ...
  *
+ * @return A `PARCBitVector` containing the link masks indicated in the parameter list.
+ *
  * Example:
  * @code
  * {
@@ -117,4 +119,19 @@ CCNxTestrigLink *ccnxTestrig_GetLinkByID(CCNxTestrig *rig, CCNxTestrigLinkID lin
  * @endcode
  */
 PARCBitVector *ccnxTestrig_GetLinkVector(CCNxTestrig *rig, CCNxTestrigLinkID linkID, ...);
+
+/**
+ * Flush all pending messages on each of the testrig links.
+ *
+ * @param [in] rig A `CCNxTestrig` instance.
+ *
+ * Example:
+ * @code
+ * {
+ *     CCNxTestrig *rig = ...
+ *     ccnxTestrig_FlushLinks(rig);
+ * }
+ * @endcode
+ */
+void ccnxTestrig_FlushLinks(CCNxTestrig *rig);
 #endif // ccnx_testrig_h

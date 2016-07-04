@@ -197,7 +197,7 @@ ccnxTestrig_GetLinkVector(CCNxTestrig *rig, CCNxTestrigLinkID linkID, ...)
     va_list linkList;
     va_start(linkList, linkID);
     parcBitVector_Set(vector, linkID);
-    for (CCNxTestrigLinkID id = linkID; id != CCNxTestrigLinkID_NULL; id = va_arg(linkList, CCNxTestrigLinkID)) {
+    for (CCNxTestrigLinkID id = linkID; id < CCNxTestrigLinkID_NULL; id = va_arg(linkList, CCNxTestrigLinkID)) {
         parcBitVector_Set(vector, id);
     }
 
@@ -205,11 +205,27 @@ ccnxTestrig_GetLinkVector(CCNxTestrig *rig, CCNxTestrigLinkID linkID, ...)
 }
 
 void
+ccnxTestrig_FlushLinks(CCNxTestrig *rig)
+{
+    for (CCNxTestrigLinkID id = CCNxTestrigLinkID_LinkA; id != CCNxTestrigLinkID_NULL; id++) {
+        CCNxTestrigLink *link = ccnxTestrig_GetLinkByID(rig, id);
+        PARCBuffer *receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(link, 100);
+        while (receiveBuffer != NULL) {
+            parcBuffer_Release(&receiveBuffer);
+            receiveBuffer = ccnxTestrigLink_ReceiveWithTimeout(link, 100);
+        }
+        if (receiveBuffer != NULL) {
+            parcBuffer_Release(&receiveBuffer);
+        }
+    }
+}
+
+void
 showUsage()
 {
     printf("Usage: ccnxTestrig [-h] [-t (UDP | TCP)] [-a <local address>] [-p <local port>] \n");
     printf(" -a       --address           Local IP address (localhost by default)\n");
-    printf(" -p       --port              Local IP port (9596 by defualt)\n");
+    printf(" -p       --port              Local IP port (9696 by defualt)\n");
     printf(" -t       --transport         Transport mechanism (0 = UDP, 1 = TCP)\n");
     printf(" -h       --help              Display the help message\n");
 }
