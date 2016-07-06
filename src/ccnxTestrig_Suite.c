@@ -320,6 +320,7 @@ ccnxTestrigSuite_ContentObjectTest_6(CCNxTestrig *rig, char *testCaseName)
 }
 
 // Request object, wrong return, self-satisfied
+// XXX: gotcha
 static CCNxTestrigSuiteTestResult *
 ccnxTestrigSuite_ContentObjectTestErrors_1(CCNxTestrig *rig, char *testCaseName)
 {
@@ -382,7 +383,7 @@ ccnxTestrigSuite_ContentObjectTestErrors_3(CCNxTestrig *rig, char *testCaseName)
     CCNxTestrigSuiteTestResult *testCase = ccnxTestrigSuiteTestResult_Create(testCaseName);
 
     // Create the test packets
-    CCNxName *testName = _createRandomName("ccnx:/test/c");
+    CCNxName *testName = _createRandomName("ccnx:/test/b");
     CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
     PARCBuffer *testPayload = parcBuffer_Allocate(1024);
     CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
@@ -597,7 +598,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_2(CCNxTestrig *rig, char *te
     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkB));
     CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, content, CCNxTestrigLinkID_LinkB);
-    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveOneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
+    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveNoneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
 
     CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
 
@@ -627,7 +628,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_3(CCNxTestrig *rig, char *te
     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkB));
     CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, content, CCNxTestrigLinkID_LinkB);
-    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveOneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
+    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveNoneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
 
     CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
 
@@ -649,7 +650,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_4(CCNxTestrig *rig, char *te
     PARCBuffer *testPayload = parcBuffer_Allocate(1024);
     CCNxContentObject *content = ccnxContentObject_CreateWithPayload(testPayload);
 
-    PARCBuffer *signatureBits = parcBuffer_Allocate(10); // arbitrary bufer size -- not important
+    PARCBuffer *signatureBits = parcBuffer_Allocate(256);
     PARCSignature *signature = parcSignature_Create(PARCSigningAlgorithm_RSA, PARCCryptoHashType_SHA256, signatureBits);
     PARCBuffer *keyId = parcBuffer_Allocate(32);
 
@@ -665,7 +666,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_4(CCNxTestrig *rig, char *te
     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkB));
     CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, content, CCNxTestrigLinkID_LinkB);
-    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveOneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
+    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveNoneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
 
     CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
 
@@ -705,7 +706,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_5(CCNxTestrig *rig, char *te
     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkB));
     CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, content, CCNxTestrigLinkID_LinkB);
-    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveOneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
+    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveNoneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
 
     CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
 
@@ -746,7 +747,7 @@ ccnxTestrigSuite_ContentObjectTestRestrictionErrors_6(CCNxTestrig *rig, char *te
     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkB));
     CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, content, CCNxTestrigLinkID_LinkB);
-    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveOneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
+    CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveNoneStep(script, step3, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
 
     CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
 
@@ -832,7 +833,7 @@ ccnxTestrigSuite_RunTest(CCNxTestrig *rig, CCNxTestrigSuiteTest test)
             result = ccnxTestrigSuite_ContentObjectTestRestrictions_3(rig, _testCaseNames[test]);
             break;
         case CCNxTestrigSuiteTest_ContentObjectRestrictions_4:
-            result = ccnxTestrigSuite_ContentObjectTestRestrictions_3(rig, _testCaseNames[test]);
+            result = ccnxTestrigSuite_ContentObjectTestRestrictions_4(rig, _testCaseNames[test]);
             break;
         case CCNxTestrigSuiteTest_ContentObjectRestrictionErrors_1:
             result = ccnxTestrigSuite_ContentObjectTestRestrictionErrors_1(rig, _testCaseNames[test]);
@@ -871,10 +872,6 @@ ccnxTestrigSuite_RunAll(CCNxTestrig *rig)
         CCNxTestrigSuiteTestResult *result = ccnxTestrigSuite_RunTest(rig, i);
         if (result != NULL) {
             ccnxTestrigSuiteTestResult_Report(result, reporter);
-        }
-
-        if (ccnxTestrigSuiteTestResult_IsFailure(result)) {
-            break;
         }
 
         // Save the result

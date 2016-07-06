@@ -152,11 +152,17 @@ ccnxTestrigPacketUtility_EncodePacket(CCNxTlvDictionary *dict)
 PARCBuffer *
 ccnxTestrigPacketUtility_ComputeMessageHash(CCNxTlvDictionary *dictionary)
 {
-    CCNxWireFormatMessageInterface *wireFacade = ccnxWireFormatMessageInterface_GetInterface(dictionary);
-    PARCCryptoHash *hash = wireFacade->computeContentObjectHash(dictionary);
+    PARCBuffer *wireFormat = ccnxTestrigPacketUtility_EncodePacket(dictionary);
+    CCNxMetaMessage *message = ccnxMetaMessage_CreateFromWireFormatBuffer(wireFormat);
+
+    CCNxWireFormatMessageInterface *wireFacade = ccnxWireFormatMessageInterface_GetInterface(message);
+    PARCCryptoHash *hash = wireFacade->computeContentObjectHash(message);
 
     PARCBuffer *digest = parcBuffer_Acquire(parcCryptoHash_GetDigest(hash));
     parcCryptoHash_Release(&hash);
+
+    parcBuffer_Release(&wireFormat);
+    ccnxMetaMessage_Release(&message);
 
     return digest;
 }
