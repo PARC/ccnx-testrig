@@ -106,7 +106,6 @@ CCNxTestrigScript *ccnxTestrigScript_Create(char *testCase);
 CCNxTestrigScriptStep *ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, CCNxTlvDictionary *packet, CCNxTestrigLinkID linkId);
 
 /**
- * XXX CAW
  * Add a "respond step" to the test case. When executed, this will send the specified
  * packet to the links that received packets in the referenced step.
  *
@@ -119,17 +118,21 @@ CCNxTestrigScriptStep *ccnxTestrigScript_AddSendStep(CCNxTestrigScript *script, 
  * Example:
  * @code
  * {
- *     XXX
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("test case");
+ *
+ *     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
+ *     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkB));
+ *
+ *     CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddRespondStep(script, step2, content);
  * }
  * @endcode
  */
 CCNxTestrigScriptStep *ccnxTestrigScript_AddRespondStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, CCNxTlvDictionary *packet);
 
 /**
- * XXX CAW
- * Add a "receive step" to the test case. When executed, this step will receive a packet
- * from the specified link and verify that it matches that which was sent in the
- * corresponding send step. If not, the failure message is used for the execution result.
+ * Add a "receive one step" to the test case. When executed, this step will receive a packet
+ * from one of the specified links and verify that it matches that which was sent in the
+ * corresponding send step. If not, the result fails.
  *
  * @param [in] script A `CCNxTestrigScript` instance.
  * @param [in] step The referncing `CCNxTestrigScriptStep` step.
@@ -140,16 +143,19 @@ CCNxTestrigScriptStep *ccnxTestrigScript_AddRespondStep(CCNxTestrigScript *scrip
  * Example:
  * @code
  * {
- *     XXX
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("test case");
+ *     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
+ *
+ *     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkC));
  * }
  * @endcode
  */
 CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveOneStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, PARCBitVector *linkVector);
 
 /**
- * XXX CAW
  * Add a "null receive step" to the test case. When executed, this step will
- * attempt to receive a packet from the specified link and verify that it failed.
+ * attempt to receive a packet from the specified link and verify that it fails.
+ * This checks to ensure that no packet is received on the specified links.
  *
  * @param [in] script A `CCNxTestrigScript` instance.
  * @param [in] step The referncing `CCNxTestrigScriptStep` step.
@@ -160,16 +166,20 @@ CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveOneStep(CCNxTestrigScript *sc
  * Example:
  * @code
  * {
- *     XXX
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("test case");
+ *     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
+ *
+ *     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveNoneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkB, CCNxTestrigLinkID_LinkC));
  * }
  * @endcode
  */
 CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveNoneStep(CCNxTestrigScript *script, CCNxTestrigScriptStep *step, PARCBitVector *linkVector);
 
 /**
- * XXX CAW
  * Add a "receive all step" to the test case. When executed, this step will
- * attempt to receive a packet from every specified link and fail if it doesn't succeed.
+ * attempt to receive a packet from every specified link and fail if it doesn't
+ * succeed for each link. That is, the correct sent packet must be received on
+ * all of the links
  *
  * @param [in] script A `CCNxTestrigScript` instance
  * @param [in] step The referencing `CCNxTestrigScriptStep` step.
@@ -180,7 +190,10 @@ CCNxTestrigScriptStep *ccnxTestrigScript_AddReceiveNoneStep(CCNxTestrigScript *s
  * Example:
  * @code
  * {
- *     XXX
+ *     CCNxTestrigScript *script = ccnxTestrigScript_Create("test case");
+ *     CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
+ *
+ *     CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveNoneStep(script, step1, ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkC));
  * }
  * @endcode
  */
