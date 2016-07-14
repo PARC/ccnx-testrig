@@ -11,17 +11,25 @@ the forwarder-under-test will forward these packets correctly. That is,
 the Interest and Content Object will be routed to the correct links.
 
 ~~~
-CCNxName *testName = _createRandomName("ccnx:/test/b");
+// Create the test packets
+CCNxName *testName = _createRandomName("ccnx:/test/c");
+assertNotNull(testName, "The name must not be NULL");
+
+// Create the protocol messages
 CCNxInterest *interest = ccnxInterest_Create(testName, 1000, NULL, NULL);
 PARCBuffer *testPayload = parcBuffer_Allocate(1024);
 CCNxContentObject *content = ccnxContentObject_CreateWithNameAndPayload(testName, testPayload);
 
+// Build the script
 CCNxTestrigScript *script = ccnxTestrigScript_Create(testCaseName);
-CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkA, interest);
-CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveStep(script, CCNxTestrigLinkID_LinkB, step1, "Failed to receive an interest packet from the forwarder.");
-CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, CCNxTestrigLinkID_LinkB, content);
-CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveStep(script, CCNxTestrigLinkID_LinkA, step3, "Failed to receive a content packet from the forwarder.");
+CCNxTestrigScriptStep *step1 = ccnxTestrigScript_AddSendStep(script, interest, CCNxTestrigLinkID_LinkA);
+CCNxTestrigScriptStep *step2 = ccnxTestrigScript_AddReceiveOneStep(script, step1, 
+  ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkC));
+CCNxTestrigScriptStep *step3 = ccnxTestrigScript_AddSendStep(script, content, CCNxTestrigLinkID_LinkC);
+CCNxTestrigScriptStep *step4 = ccnxTestrigScript_AddReceiveOneStep(script, step3, 
+  ccnxTestrig_GetLinkVector(rig, CCNxTestrigLinkID_LinkA));
 
+// Execute it
 CCNxTestrigSuiteTestResult *testCaseResult = ccnxTestrigScript_Execute(script, rig);
 ~~~
 
